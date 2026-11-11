@@ -1,4 +1,5 @@
-// The app's shared building blocks: page frame, buttons, bottom sheet, text field.
+// The app's shared building blocks, in Apple's style: large titles, rounded cards with a faint glass edge,
+// grouped lists, capsule buttons, glass round buttons, floating sheets.
 
 import React, { useEffect, useRef } from 'react';
 import {
@@ -17,11 +18,13 @@ import {
   type TextInputProps,
   type ViewStyle,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSafeAreaInsets, type EdgeInsets } from 'react-native-safe-area-context';
+import Svg, { Defs, RadialGradient, Rect, Stop } from 'react-native-svg';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 
-import { C, PAD, T } from '../theme';
+import { C, PAD, RADIUS, T, TAB_H, alpha } from '../theme';
+import { Glass } from './Glass';
 
 export type IconName = keyof typeof Ionicons.glyphMap;
 
@@ -47,13 +50,39 @@ export function confirmAction(title: string, message: string, actionLabel: strin
   ]);
 }
 
-// One tab's page: big title, optional buttons beside it, scrolling content, optional pinned footer.
+// Where the floating tab bar sits, and how much room the page leaves for it.
+export function tabBarBottom(insets: EdgeInsets): number {
+  return Math.max(insets.bottom - 6, 12);
+}
+export function tabBarSpace(insets: EdgeInsets): number {
+  return tabBarBottom(insets) + TAB_H + 12;
+}
+
+// A soft glow of the section's colour at the top of the page, so the glass has something to show.
+function Glow({ color }: { color: string }) {
+  const id = 'glow' + color.replace(/[^a-zA-Z0-9]/g, '');
+  return (
+    <Svg style={styles.glow} width="100%" height={520} pointerEvents="none">
+      <Defs>
+        <RadialGradient id={id} cx="50%" cy="0%" rx="85%" ry="100%" fx="50%" fy="0%">
+          <Stop offset="0" stopColor={color} stopOpacity={0.34} />
+          <Stop offset="0.6" stopColor={color} stopOpacity={0.12} />
+          <Stop offset="1" stopColor={color} stopOpacity={0} />
+        </RadialGradient>
+      </Defs>
+      <Rect x="0" y="0" width="100%" height="100%" fill={`url(#${id})`} />
+    </Svg>
+  );
+}
+
+// One tab's page: large title, optional buttons beside it, scrolling content, optional floating button.
 export function Screen({
   title,
   subtitle,
   left,
   right,
   footer,
+  glow,
   children,
 }: {
   title: React.ReactNode;
@@ -61,35 +90,40 @@ export function Screen({
   left?: React.ReactNode;
   right?: React.ReactNode;
   footer?: React.ReactNode;
+  glow?: string;
   children: React.ReactNode;
 }) {
   const insets = useSafeAreaInsets();
+  const space = tabBarSpace(insets);
   return (
-    <View style={{ flex: 1, paddingTop: insets.top + 6 }}>
-      <View style={styles.header}>
-        {left}
-        <View style={{ flex: 1 }}>
-          {typeof title === 'string' ? (
-            <Text style={T.title} numberOfLines={1}>
-              {title}
-            </Text>
-          ) : (
-            title
-          )}
-          {subtitle ? <Text style={[T.muted, { marginTop: 1 }]}>{subtitle}</Text> : null}
+    <View style={{ flex: 1 }}>
+      {glow ? <Glow color={glow} /> : null}
+      <View style={{ flex: 1, paddingTop: insets.top + 4 }}>
+        <View style={styles.header}>
+          {left}
+          <View style={{ flex: 1 }}>
+            {typeof title === 'string' ? (
+              <Text style={T.title} numberOfLines={1}>
+                {title}
+              </Text>
+            ) : (
+              title
+            )}
+            {subtitle ? <Text style={[T.muted, { marginTop: 1 }]}>{subtitle}</Text> : null}
+          </View>
+          {right}
         </View>
-        {right}
+        <ScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={{ paddingHorizontal: PAD, paddingTop: 6, paddingBottom: space + (footer ? 76 : 20) }}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+          automaticallyAdjustKeyboardInsets
+        >
+          {children}
+        </ScrollView>
       </View>
-      <ScrollView
-        style={{ flex: 1 }}
-        contentContainerStyle={{ paddingHorizontal: PAD, paddingTop: 8, paddingBottom: 28 }}
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
-        automaticallyAdjustKeyboardInsets
-      >
-        {children}
-      </ScrollView>
-      {footer ? <View style={styles.footer}>{footer}</View> : null}
+      {footer ? <View style={[styles.footer, { bottom: space }]}>{footer}</View> : null}
     </View>
   );
 }
@@ -98,6 +132,49 @@ export function Card({ children, style }: { children: React.ReactNode; style?: S
   return <View style={[styles.card, style]}>{children}</View>;
 }
 
+// Apple's grouped list: rows in one rounded card, thin lines between them.
+export function Group({ children, style }: { children: React.ReactNode; style?: StyleProp<ViewStyle> }) {
+  return <View style={[styles.card, styles.group, style]}>{children}</View>;
+}
+
+export function Row({
+  children,
+  onPress,
+  last,
+  chevron,
+  style,
+}: {
+  children: React.ReactNode;
+  onPress?: () => void;
+  last?: boolean;
+  chevron?: boolean;
+  style?: StyleProp<ViewStyle>;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      disabled={!onPress}
+      accessibilityRole={onPress ? 'button' : undefined}
+      style={({ pressed }) => [styles.row, pressed && { backgroundColor: 'rgba(255,255,255,0.08)' }]}
+    >
+      <View style={[styles.rowInner, !last && styles.rowLine, style]}>
+        {children}
+        {chevron ? <Ionicons name="chevron-forward" size={17} color={C.faint} style={{ marginLeft: 6 }} /> : null}
+      </View>
+    </Pressable>
+  );
+}
+
+// A small grey heading above a card, as in Settings.
+export function SectionTitle({ children, style }: { children: React.ReactNode; style?: StyleProp<ViewStyle> }) {
+  return (
+    <View style={[{ marginTop: 26, marginBottom: 7, marginLeft: 16 }, style]}>
+      <Text style={T.label}>{children}</Text>
+    </View>
+  );
+}
+
+// A filled capsule: the main action.
 export function PrimaryButton({
   label,
   onPress,
@@ -113,6 +190,7 @@ export function PrimaryButton({
   disabled?: boolean;
   style?: StyleProp<ViewStyle>;
 }) {
+  const textColor = color === C.text ? C.ink : '#FFFFFF';
   return (
     <Pressable
       onPress={onPress}
@@ -120,17 +198,17 @@ export function PrimaryButton({
       accessibilityRole="button"
       style={({ pressed }) => [
         styles.primary,
-        { backgroundColor: color, opacity: disabled ? 0.35 : pressed ? 0.8 : 1 },
+        { backgroundColor: color, opacity: disabled ? 0.35 : pressed ? 0.75 : 1 },
         style,
       ]}
     >
-      {icon ? <Ionicons name={icon} size={20} color={C.ink} /> : null}
-      <Text style={styles.primaryText}>{label}</Text>
+      {icon ? <Ionicons name={icon} size={21} color={textColor} /> : null}
+      <Text style={[styles.primaryText, { color: textColor }]}>{label}</Text>
     </Pressable>
   );
 }
 
-// A quieter button: outlined, or just coloured text.
+// Apple's tinted capsule (the colour, see-through, behind coloured text), or just coloured text.
 export function GhostButton({
   label,
   onPress,
@@ -150,19 +228,25 @@ export function GhostButton({
     <Pressable
       onPress={onPress}
       accessibilityRole="button"
-      style={({ pressed }) => [styles.ghost, outlined && styles.ghostOutline, { opacity: pressed ? 0.6 : 1 }, style]}
+      style={({ pressed }) => [
+        styles.ghost,
+        outlined && { backgroundColor: color.startsWith('#') ? alpha(color, 0.16) : C.fill },
+        { opacity: pressed ? 0.6 : 1 },
+        style,
+      ]}
     >
-      {icon ? <Ionicons name={icon} size={18} color={color} /> : null}
+      {icon ? <Ionicons name={icon} size={19} color={color} /> : null}
       <Text style={[styles.ghostText, { color }]}>{label}</Text>
     </Pressable>
   );
 }
 
+// A round button; `filled` makes it Apple's glass circle, as in the top bars of Notes or Calendar.
 export function IconButton({
   icon,
   onPress,
   color = C.text,
-  size = 22,
+  size = 21,
   label,
   filled,
   disabled,
@@ -175,32 +259,34 @@ export function IconButton({
   filled?: boolean;
   disabled?: boolean;
 }) {
+  const inner = <Ionicons name={icon} size={size} color={color} />;
   return (
     <Pressable
       onPress={onPress}
       disabled={disabled}
-      hitSlop={8}
+      hitSlop={6}
       accessibilityRole="button"
       accessibilityLabel={label}
-      style={({ pressed }) => [
-        styles.iconBtn,
-        filled && { backgroundColor: C.card2 },
-        { opacity: disabled ? 0.25 : pressed ? 0.5 : 1 },
-      ]}
+      style={({ pressed }) => ({ opacity: disabled ? 0.3 : pressed ? 0.55 : 1 })}
     >
-      <Ionicons name={icon} size={size} color={color} />
+      {filled ? (
+        <Glass style={styles.glassBtn} interactive>
+          {inner}
+        </Glass>
+      ) : (
+        <View style={styles.iconBtn}>{inner}</View>
+      )}
     </Pressable>
   );
 }
 
-// A row of choices where one is picked.
+// Apple's segmented control: a grey capsule, the chosen part a lighter capsule.
 export function Segmented<K extends string>({
   options,
   value,
   onChange,
-  color = C.text,
 }: {
-  options: { key: K; label: string; color?: string }[];
+  options: { key: K; label: string }[];
   value: K;
   onChange: (k: K) => void;
   color?: string;
@@ -218,9 +304,9 @@ export function Segmented<K extends string>({
             }}
             accessibilityRole="button"
             accessibilityState={{ selected: on }}
-            style={[styles.segment, on && { backgroundColor: o.color ?? color }]}
+            style={[styles.segment, on && styles.segmentOn]}
           >
-            <Text style={[styles.segmentText, on && { color: C.ink }]} numberOfLines={1}>
+            <Text style={[styles.segmentText, on && { fontWeight: '600' }]} numberOfLines={1}>
               {o.label}
             </Text>
           </Pressable>
@@ -230,7 +316,7 @@ export function Segmented<K extends string>({
   );
 }
 
-// A panel that comes up from the bottom over a dimmed screen. Tap outside to close.
+// A floating panel that comes up from the bottom (iOS 26 style). Tap outside to close.
 export function Sheet({
   visible,
   onClose,
@@ -245,28 +331,33 @@ export function Sheet({
   children: React.ReactNode;
 }) {
   const insets = useSafeAreaInsets();
-  const y = useRef(new Animated.Value(60)).current;
+  const y = useRef(new Animated.Value(80)).current;
   useEffect(() => {
     if (!visible) return;
-    y.setValue(60);
-    Animated.timing(y, { toValue: 0, duration: 220, useNativeDriver: Platform.OS !== 'web' }).start();
+    y.setValue(80);
+    Animated.spring(y, { toValue: 0, damping: 22, stiffness: 260, mass: 0.9, useNativeDriver: Platform.OS !== 'web' }).start();
   }, [visible, y]);
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <View style={{ flex: 1, justifyContent: 'flex-end' }}>
+        <View style={styles.sheetWrap}>
           <Pressable style={styles.backdrop} onPress={onClose} accessibilityLabel="Close" />
           <Animated.View
-            style={[styles.sheet, { paddingBottom: insets.bottom + 16, transform: [{ translateY: y }] }]}
+            style={[styles.sheet, { paddingBottom: Math.max(insets.bottom - 4, 18), transform: [{ translateY: y }] }]}
           >
             <View style={styles.grab} />
             {title ? (
-              <Text style={T.h2} numberOfLines={1}>
-                {title}
-              </Text>
+              <View style={styles.sheetHead}>
+                <View style={{ flex: 1 }}>
+                  <Text style={T.h2} numberOfLines={1}>
+                    {title}
+                  </Text>
+                  {subtitle ? <Text style={[T.small, { marginTop: 2 }]}>{subtitle}</Text> : null}
+                </View>
+                <IconButton icon="close" size={19} label="Close" filled onPress={onClose} color={C.muted} />
+              </View>
             ) : null}
-            {subtitle ? <Text style={[T.muted, { marginTop: 2 }]}>{subtitle}</Text> : null}
             {children}
           </Animated.View>
         </View>
@@ -284,11 +375,11 @@ export function Field({
 }: TextInputProps & { label: string; suffix?: string; containerStyle?: StyleProp<ViewStyle> }) {
   return (
     <View style={[{ marginTop: 14 }, containerStyle]}>
-      <Text style={T.label}>{label}</Text>
+      <Text style={[T.small, { marginLeft: 4 }]}>{label}</Text>
       <View style={styles.inputWrap}>
         <TextInput
           placeholderTextColor={C.faint}
-          selectionColor={C.text}
+          selectionColor={C.weight}
           keyboardAppearance="dark"
           style={styles.input}
           {...props}
@@ -317,7 +408,7 @@ export function DateStepper({
     <View style={styles.stepper}>
       <IconButton icon="chevron-back" onPress={onPrev} label="Previous day" filled />
       <Pressable onPress={onPressLabel} disabled={!onPressLabel} style={{ flex: 1, alignItems: 'center' }}>
-        <Text style={[T.body, { fontWeight: '700' }]}>{label}</Text>
+        <Text style={T.headline}>{label}</Text>
       </Pressable>
       <IconButton icon="chevron-forward" onPress={onNext} label="Next day" filled disabled={nextDisabled} />
     </View>
@@ -327,73 +418,102 @@ export function DateStepper({
 export function Empty({ icon, title, text }: { icon: IconName; title: string; text: string }) {
   return (
     <View style={styles.empty}>
-      <Ionicons name={icon} size={30} color={C.faint} />
-      <Text style={[T.body, { fontWeight: '700', marginTop: 10 }]}>{title}</Text>
-      <Text style={[T.muted, { textAlign: 'center', marginTop: 4, lineHeight: 20 }]}>{text}</Text>
+      <Ionicons name={icon} size={44} color={C.faint} />
+      <Text style={[T.h2, { marginTop: 12, fontSize: 20 }]}>{title}</Text>
+      <Text style={[T.muted, { textAlign: 'center', marginTop: 6, lineHeight: 20 }]}>{text}</Text>
     </View>
   );
 }
 
+const continuous = { borderCurve: 'continuous' as const };
+
 const styles = StyleSheet.create({
+  glow: { position: 'absolute', top: 0, left: 0, right: 0 },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    paddingHorizontal: PAD,
+    paddingHorizontal: PAD + 4,
     paddingBottom: 8,
-    minHeight: 52,
+    minHeight: 54,
   },
-  footer: { paddingHorizontal: PAD, paddingTop: 8, paddingBottom: 12 },
-  card: { backgroundColor: C.card, borderRadius: 18, padding: 16 },
+  footer: { position: 'absolute', left: PAD, right: PAD },
+  card: {
+    backgroundColor: C.card,
+    borderRadius: RADIUS,
+    ...continuous,
+    padding: 16,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: C.rim,
+  },
+  group: { padding: 0, overflow: 'hidden' },
+  row: {},
+  rowInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    minHeight: 52,
+    paddingVertical: 11,
+    paddingRight: 16,
+    marginLeft: 16,
+    gap: 8,
+  },
+  rowLine: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: C.line },
   primary: {
     height: 52,
-    borderRadius: 14,
+    borderRadius: 26,
+    ...continuous,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    paddingHorizontal: 18,
+    paddingHorizontal: 22,
   },
-  primaryText: { color: C.ink, fontSize: 17, fontWeight: '700' },
+  primaryText: { fontSize: 17, fontWeight: '600', letterSpacing: -0.4 },
   ghost: {
     height: 46,
-    borderRadius: 14,
+    borderRadius: 23,
+    ...continuous,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    paddingHorizontal: 14,
+    paddingHorizontal: 18,
   },
-  ghostOutline: { borderWidth: 1, borderColor: C.line },
-  ghostText: { fontSize: 16, fontWeight: '600' },
-  iconBtn: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center' },
-  segmented: { flexDirection: 'row', backgroundColor: C.card, borderRadius: 12, padding: 3 },
-  segment: { flex: 1, height: 36, borderRadius: 9, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4 },
-  segmentText: { color: C.muted, fontSize: 14, fontWeight: '700' },
-  backdrop: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.6)' },
+  ghostText: { fontSize: 17, fontWeight: '600', letterSpacing: -0.4 },
+  iconBtn: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
+  glassBtn: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
+  segmented: { flexDirection: 'row', backgroundColor: C.fill, borderRadius: 20, padding: 3, height: 38 },
+  segment: { flex: 1, borderRadius: 17, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4 },
+  segmentOn: { backgroundColor: C.thumb },
+  segmentText: { color: C.text, fontSize: 14, fontWeight: '500', letterSpacing: -0.2 },
+  backdrop: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.45)' },
   sheet: {
-    backgroundColor: C.card,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    paddingHorizontal: PAD,
-    paddingTop: 10,
+    backgroundColor: C.cardSolid,
+    borderRadius: 38,
+    ...continuous,
+    paddingHorizontal: 20,
+    paddingTop: 8,
     width: '100%',
-    maxWidth: 500,
-    alignSelf: 'center',
+    maxWidth: 484,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: C.rim,
   },
+  sheetWrap: { flex: 1, justifyContent: 'flex-end', alignItems: 'center', padding: 8 },
+  sheetHead: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 4 },
   grab: {
     alignSelf: 'center',
-    width: 38,
+    width: 36,
     height: 5,
     borderRadius: 3,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    marginBottom: 14,
+    backgroundColor: 'rgba(235,235,245,0.3)',
+    marginBottom: 12,
   },
   inputWrap: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: C.card2,
-    borderRadius: 12,
+    borderRadius: 14,
+    ...continuous,
     paddingHorizontal: 14,
     marginTop: 6,
     height: 50,
@@ -401,5 +521,5 @@ const styles = StyleSheet.create({
   },
   input: { flex: 1, minWidth: 0, color: C.text, fontSize: 17, height: 50, padding: 0 },
   stepper: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  empty: { alignItems: 'center', paddingVertical: 36, paddingHorizontal: 20 },
+  empty: { alignItems: 'center', paddingVertical: 40, paddingHorizontal: 24 },
 });

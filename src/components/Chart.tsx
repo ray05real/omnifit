@@ -71,8 +71,9 @@ export function Chart({
   const ticks: number[] = [];
   for (let v = lo; v <= hi + step / 1000; v += step) ticks.push(Math.round(v * 1000) / 1000);
 
-  const L = 42;
-  const R = 10;
+  // As in Apple Health: the scale on the right, dashed grid lines.
+  const L = 6;
+  const R = 44;
   const TOP = 10;
   const BOTTOM = 24;
   const days = Math.max(1, daysBetween(from, to));
@@ -90,8 +91,8 @@ export function Chart({
         <Svg width={width} height={height}>
           {ticks.map((t) => (
             <React.Fragment key={t}>
-              <Line x1={L} x2={width - R} y1={y(t)} y2={y(t)} stroke={C.line} strokeWidth={1} />
-              <SvgText fontFamily={FONT} x={L - 8} y={y(t) + 4} fill={C.muted} fontSize={11} textAnchor="end">
+              <Line x1={L} x2={width - R + 4} y1={y(t)} y2={y(t)} stroke={C.line} strokeWidth={1} strokeDasharray={t === lo ? undefined : [3, 3]} />
+              <SvgText fontFamily={FONT} x={width - R + 10} y={y(t) + 4} fill={C.muted} fontSize={11} textAnchor="start">
                 {format(t)}
               </SvgText>
             </React.Fragment>
@@ -104,7 +105,7 @@ export function Chart({
               y={y(p.value)}
               width={barW}
               height={Math.max(1, y(lo) - y(p.value))}
-              rx={Math.min(3, barW / 2)}
+              rx={Math.min(4, barW / 2)}
               fill={p.color ?? color}
             />
           ))}
@@ -116,9 +117,9 @@ export function Chart({
               y1={y(goal)}
               y2={y(goal)}
               stroke={C.text}
-              strokeOpacity={0.55}
+              strokeOpacity={0.7}
               strokeWidth={1.5}
-              strokeDasharray={[5, 5]}
+              strokeDasharray={[6, 4]}
             />
           ) : null}
 

@@ -4,14 +4,14 @@ import React from 'react';
 import { View } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
 
-import { C } from '../theme';
+import { C, alpha } from '../theme';
 
 export function Ring({
   size,
   stroke,
   progress,
   color,
-  track = C.track,
+  track,
   children,
 }: {
   size: number;
@@ -27,7 +27,8 @@ export function Ring({
   return (
     <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
       <Svg width={size} height={size} style={{ position: 'absolute' }}>
-        <Circle cx={size / 2} cy={size / 2} r={r} stroke={track} strokeWidth={stroke} fill="none" />
+        {/* As Apple's Activity rings: the empty part is the ring's own colour, dimmed. */}
+        <Circle cx={size / 2} cy={size / 2} r={r} stroke={track ?? (color.startsWith('#') ? alpha(color, 0.22) : C.track)} strokeWidth={stroke} fill="none" />
         {p > 0 ? (
           <Circle
             cx={size / 2}

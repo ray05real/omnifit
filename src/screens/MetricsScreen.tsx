@@ -6,6 +6,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { Chart, type Bar } from '../components/Chart';
 import { Ring } from '../components/Ring';
+import { Glass } from '../components/Glass';
 import { Card, IconButton, Screen, Segmented, Sheet, buzz } from '../components/ui';
 import {
   average,
@@ -69,12 +70,14 @@ export const MetricsScreen = React.memo(function MetricsScreen() {
   return (
     <Screen
       title="Metrics"
+      glow="#8E8E93"
       right={
-        <View style={styles.modeSwitch}>
+        <Glass style={styles.modeSwitch}>
+          <View pointerEvents="none" style={[styles.modeThumb, mode === 'graph' && { left: 45 }]} />
           <IconButton
             icon={mode === 'calendar' ? 'calendar' : 'calendar-outline'}
             label="Calendar"
-            color={mode === 'calendar' ? C.ink : C.muted}
+            color={mode === 'calendar' ? C.text : C.muted}
             size={19}
             onPress={() => {
               buzz();
@@ -84,15 +87,14 @@ export const MetricsScreen = React.memo(function MetricsScreen() {
           <IconButton
             icon={mode === 'graph' ? 'stats-chart' : 'stats-chart-outline'}
             label="Graph"
-            color={mode === 'graph' ? C.ink : C.muted}
+            color={mode === 'graph' ? C.text : C.muted}
             size={19}
             onPress={() => {
               buzz();
               setMode('graph');
             }}
           />
-          <View pointerEvents="none" style={[styles.modeThumb, mode === 'graph' && { left: 41 }]} />
-        </View>
+        </Glass>
       }
     >
       <Segmented options={METRICS} value={metric} onChange={setMetric} />
@@ -178,67 +180,66 @@ function CalendarView({ metric, color, today }: { metric: Metric; color: string;
 
   return (
     <>
+      {/* As in Apple's Calendar: the month's name big on the left, glass arrows on the right. */}
       <View style={styles.monthRow}>
-        <IconButton icon="chevron-back" label="Previous month" filled onPress={() => move(-1)} />
         <Pressable
-          style={{ flex: 1, alignItems: 'center' }}
+          style={{ flex: 1 }}
           disabled={isThisMonth}
           onPress={() => {
             setYm({ y: now.getFullYear(), m: now.getMonth() });
             setSelected(today);
           }}
         >
-          <Text style={T.h2}>{monthTitle(ym.y, ym.m)}</Text>
+          <Text style={styles.monthName}>
+            {monthTitle(ym.y, ym.m).split(' ')[0]} <Text style={{ color: C.today }}>{ym.y}</Text>
+          </Text>
           <Text style={[T.small, { marginTop: 2 }]}>{summary}</Text>
         </Pressable>
+        <IconButton icon="chevron-back" label="Previous month" filled onPress={() => move(-1)} />
         <IconButton icon="chevron-forward" label="Next month" filled onPress={() => move(1)} disabled={isThisMonth} />
       </View>
 
       <View style={styles.weekdays}>
         {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((w, i) => (
-          <Text key={i} style={styles.weekday}>
+          <Text key={i} style={[styles.weekday, i >= 5 && { color: C.faint }]}>
             {w}
           </Text>
         ))}
       </View>
       <View style={styles.grid}>
         {cells.map((date, i) => {
-          if (!date) return <View key={i} style={styles.cell} />;
+          const rowTop = i % 7 === 0 ? <View key={'l' + i} style={styles.weekLine} /> : null;
+          if (!date) return [rowTop, <View key={i} style={styles.cell} />];
           const dayNum = Number(date.slice(8));
           const future = date > today;
+          const isToday = date === today;
+          const isSel = date === selected;
           let mark: React.ReactNode = null;
-          let sub: React.ReactNode = null;
-          let numColor = future ? C.faint : C.text;
 
           if (metric === 'overload') {
             const change = dayChange(daySets(date));
-            if (change) {
-              mark = <View style={[styles.fill, { backgroundColor: changeColor(change) }]} />;
-              numColor = C.ink;
-            }
+            if (change) mark = <View style={[styles.disc, { backgroundColor: changeColor(change) }]} />;
           } else if (metric === 'nutrition') {
             const m = d.foodByDay.get(date);
             if (m && m.kcal > 0) {
               mark = (
-                <View style={styles.markAbs}>
-                  <Ring size={38} stroke={4} progress={m.kcal / d.goals.kcal} color={nutritionColor(m.kcal, d.goals.kcal)} />
-                </View>
+                <Ring size={26} stroke={4} progress={m.kcal / d.goals.kcal} color={nutritionColor(m.kcal, d.goals.kcal)}>
+                  {proteinHit(m.protein, d.goals.protein) ? <View style={[styles.subDot, { backgroundColor: C.protein }]} /> : null}
+                </Ring>
               );
-              if (proteinHit(m.protein, d.goals.protein)) sub = <View style={[styles.subDot, { backgroundColor: C.protein }]} />;
             }
           } else if (metric === 'weight') {
             const v = d.weights[date];
-            if (v !== undefined) sub = <Text style={[styles.subText, { color: C.weight }]}>{v.toFixed(1)}</Text>;
+            if (v !== undefined) mark = <Text style={[styles.subText, { color: C.weight }]}>{v.toFixed(1)}</Text>;
           } else {
             const v = d.sleep[date];
             if (v !== undefined) {
-              const c = sleepColor(sleepStatus(v, d.sleepGoal));
-              mark = <View style={[styles.fill, { backgroundColor: c, opacity: 0.22 }]} />;
-              sub = <Text style={[styles.subText, { color: c }]}>{hours1(v)}h</Text>;
+              mark = <Text style={[styles.subText, { color: sleepColor(sleepStatus(v, d.sleepGoal)) }]}>{hours1(v)}h</Text>;
             }
           }
 
-          return (
+          return [
+            rowTop,
             <Pressable
               key={i}
               style={styles.cell}
@@ -249,13 +250,21 @@ function CalendarView({ metric, color, today }: { metric: Metric; color: string;
               accessibilityRole="button"
               accessibilityLabel={formatDay(date)}
             >
-              <View style={[styles.mark, date === selected && styles.selected]}>
-                {mark}
-                <Text style={[styles.dayNum, { color: numColor }, date === today && { fontWeight: '900' }]}>{dayNum}</Text>
+              <View style={[styles.numWrap, isSel && { backgroundColor: isToday ? C.today : C.text }]}>
+                <Text
+                  style={[
+                    styles.dayNum,
+                    { color: future ? C.faint : C.text },
+                    isToday && { color: C.today, fontWeight: '600' },
+                    isSel && { color: isToday ? '#fff' : C.ink, fontWeight: '600' },
+                  ]}
+                >
+                  {dayNum}
+                </Text>
               </View>
-              <View style={styles.sub}>{sub ?? (date === today ? <View style={styles.todayBar} /> : null)}</View>
-            </Pressable>
-          );
+              <View style={styles.markArea}>{mark}</View>
+            </Pressable>,
+          ];
         })}
       </View>
 
@@ -588,31 +597,30 @@ function GraphView({ metric, color, today }: { metric: Metric; color: string; to
 }
 
 const styles = StyleSheet.create({
-  modeSwitch: { flexDirection: 'row', backgroundColor: C.card, borderRadius: 21, padding: 2, gap: 3 },
-  modeThumb: { position: 'absolute', left: 2, top: 2, width: 38, height: 38, borderRadius: 19, backgroundColor: C.text, zIndex: -1 },
+  modeSwitch: { flexDirection: 'row', borderRadius: 22, padding: 2, gap: 3 },
+  modeThumb: { position: 'absolute', left: 2, top: 2, width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.16)' },
 
-  monthRow: { flexDirection: 'row', alignItems: 'center', marginTop: 16, marginBottom: 12 },
-  weekdays: { flexDirection: 'row' },
-  weekday: { flex: 1, textAlign: 'center', color: C.faint, fontSize: 12, fontWeight: '700', marginBottom: 6 },
+  monthRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 18, marginBottom: 14 },
+  monthName: { color: C.text, fontSize: 28, fontWeight: '700', letterSpacing: 0.3 },
+  weekdays: { flexDirection: 'row', marginBottom: 4 },
+  weekday: { flex: 1, textAlign: 'center', color: C.muted, fontSize: 13, fontWeight: '500' },
   grid: { flexDirection: 'row', flexWrap: 'wrap' },
-  cell: { width: `${100 / 7}%`, height: 60, alignItems: 'center' },
-  mark: { width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center' },
-  selected: { borderWidth: 1.5, borderColor: C.text },
-  fill: { position: 'absolute', width: 34, height: 34, borderRadius: 17 },
-  markAbs: { position: 'absolute' },
-  dayNum: { fontSize: 15, fontWeight: '600', fontVariant: ['tabular-nums'] },
-  sub: { height: 14, alignItems: 'center', justifyContent: 'center' },
-  subText: { fontSize: 10.5, fontWeight: '700', fontVariant: ['tabular-nums'] },
-  subDot: { width: 5, height: 5, borderRadius: 3 },
-  todayBar: { width: 14, height: 3, borderRadius: 2, backgroundColor: C.faint },
+  weekLine: { width: '100%', height: StyleSheet.hairlineWidth, backgroundColor: C.line },
+  cell: { width: `${100 / 7}%`, height: 70, alignItems: 'center', paddingTop: 5 },
+  numWrap: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+  dayNum: { fontSize: 19, fontWeight: '400', letterSpacing: -0.4, fontVariant: ['tabular-nums'] },
+  markArea: { height: 28, alignItems: 'center', justifyContent: 'center', marginTop: 1 },
+  disc: { width: 18, height: 18, borderRadius: 9 },
+  subText: { fontSize: 11, fontWeight: '600', fontVariant: ['tabular-nums'] },
+  subDot: { width: 6, height: 6, borderRadius: 3 },
 
-  legend: { flexDirection: 'row', flexWrap: 'wrap', gap: 14, rowGap: 6, marginTop: 8, justifyContent: 'center' },
+  legend: { flexDirection: 'row', flexWrap: 'wrap', gap: 14, rowGap: 6, marginTop: 14, justifyContent: 'center' },
   legendItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   legendDot: { width: 9, height: 9, borderRadius: 5 },
 
   dayNone: { color: C.muted, fontSize: 16, marginTop: 8 },
   bigRow: { flexDirection: 'row', alignItems: 'baseline', gap: 8, marginTop: 6 },
-  big: { color: C.text, fontSize: 34, fontWeight: '800', letterSpacing: -0.8, fontVariant: ['tabular-nums'] },
+  big: { color: C.text, fontSize: 34, fontWeight: '700', letterSpacing: -0.8, fontVariant: ['tabular-nums'] },
   macroRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 14, rowGap: 4, marginTop: 10 },
   macro: { fontSize: 13, fontWeight: '700', fontVariant: ['tabular-nums'] },
   exLine: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 5 },

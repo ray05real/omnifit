@@ -1,19 +1,24 @@
-// Overload: the split (sessions), and inside a session its exercises with their sets, like the owner's notes.
-// Tap a set's numbers for the wheel; exercises only change after tapping Edit.
+// Overload: the split (sessions), and inside a session its exercises with their sets, laid out like the owner's
+// notes (each exercise its own paragraph, each set a line "50kg – 10"). Tap a set for the wheel; exercises only
+// change after tapping Edit.
 
 import React, { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
+import { Glass } from '../components/Glass';
 import { WheelColumn, WheelRow, range } from '../components/Wheel';
 import {
   Card,
   Empty,
   Field,
   GhostButton,
+  Group,
   IconButton,
   PrimaryButton,
+  Row,
   Screen,
+  SectionTitle,
   Sheet,
   buzz,
   confirmAction,
@@ -30,8 +35,8 @@ import {
   type Workout,
 } from '../lib/overload';
 import { useToday } from '../store/hooks';
-import { useTraining, type Exercise, type Session } from '../store/training';
-import { C, T, changeColor } from '../theme';
+import { useTraining, type Session } from '../store/training';
+import { C, T, alpha, changeColor } from '../theme';
 
 const CHANGE_WORD = { up: 'went up', same: 'stayed the same', down: 'went down', first: 'first time logged' };
 
@@ -46,7 +51,7 @@ export const OverloadScreen = React.memo(function OverloadScreen() {
   return <SplitList onOpen={(id, edit) => setOpen({ id, edit })} />;
 });
 
-// ───────────────────────── The split: one card per session ─────────────────────────
+// ───────────────────────── The split: one row per session ─────────────────────────
 
 function SplitList({ onOpen }: { onOpen: (id: string, edit: boolean) => void }) {
   const today = useToday();
@@ -76,7 +81,7 @@ function SplitList({ onOpen }: { onOpen: (id: string, edit: boolean) => void }) 
   };
 
   return (
-    <Screen title="Overload" subtitle={formatDay(today)}>
+    <Screen title="Overload" subtitle={formatDay(today)} glow={C.overload}>
       {sessions.length === 0 ? (
         <Empty
           icon="barbell-outline"
@@ -84,55 +89,52 @@ function SplitList({ onOpen }: { onOpen: (id: string, edit: boolean) => void }) 
           text="Add your first session (for example Push day), then write in its exercises and sets."
         />
       ) : (
-        <Text style={[T.label, { marginBottom: 10, marginTop: 6 }]}>Your split</Text>
+        <>
+          <SectionTitle style={{ marginTop: 10 }}>Your split</SectionTitle>
+          <Group>
+            {sessions.map((s, i) => {
+              const w = last.get(s.id);
+              const total = s.exercises.reduce((n, e) => n + e.sets.length, 0);
+              const doneToday = w && w.date === today ? w.sets.length : 0;
+              const change = w ? dayChange(w.sets) : null;
+              return (
+                <Row key={s.id} onPress={() => onOpen(s.id, false)} last={i === sessions.length - 1} chevron>
+                  <View style={{ flex: 1, paddingVertical: 4 }}>
+                    <Text style={styles.sessionName} numberOfLines={1}>
+                      {s.name}
+                    </Text>
+                    <Text style={[T.small, { marginTop: 2 }]}>
+                      {s.exercises.length} {s.exercises.length === 1 ? 'exercise' : 'exercises'} · {total}{' '}
+                      {total === 1 ? 'set' : 'sets'}
+                    </Text>
+                    <View style={styles.sessionStatus}>
+                      {w ? <View style={[styles.dot, { backgroundColor: changeColor(change) }]} /> : null}
+                      {doneToday > 0 ? (
+                        <Text style={[T.small, { color: C.overload, fontWeight: '600' }]}>
+                          Today · {doneToday} of {total} sets done
+                        </Text>
+                      ) : w ? (
+                        <Text style={T.small}>
+                          Last time {agoLabel(w.date, today)} · {change ? CHANGE_WORD[change] : ''}
+                        </Text>
+                      ) : (
+                        <Text style={T.small}>Not logged yet</Text>
+                      )}
+                    </View>
+                  </View>
+                </Row>
+              );
+            })}
+          </Group>
+        </>
       )}
-
-      {sessions.map((s) => {
-        const w = last.get(s.id);
-        const total = s.exercises.reduce((n, e) => n + e.sets.length, 0);
-        const doneToday = w && w.date === today ? w.sets.length : 0;
-        const change = w ? dayChange(w.sets) : null;
-        return (
-          <Pressable
-            key={s.id}
-            onPress={() => onOpen(s.id, false)}
-            accessibilityRole="button"
-            style={({ pressed }) => [styles.sessionCard, pressed && { opacity: 0.7 }]}
-          >
-            <View style={{ flex: 1 }}>
-              <Text style={styles.sessionName} numberOfLines={1}>
-                {s.name}
-              </Text>
-              <Text style={[T.muted, { marginTop: 2 }]}>
-                {s.exercises.length} {s.exercises.length === 1 ? 'exercise' : 'exercises'} · {total}{' '}
-                {total === 1 ? 'set' : 'sets'}
-              </Text>
-              <View style={styles.sessionStatus}>
-                {w ? <View style={[styles.dot, { backgroundColor: changeColor(change) }]} /> : null}
-                {doneToday > 0 ? (
-                  <Text style={[T.muted, { color: C.overload, fontWeight: '700' }]}>
-                    Today · {doneToday} of {total} sets done
-                  </Text>
-                ) : w ? (
-                  <Text style={T.muted}>
-                    Last time {agoLabel(w.date, today)} · {change ? CHANGE_WORD[change] : ''}
-                  </Text>
-                ) : (
-                  <Text style={T.muted}>Not logged yet</Text>
-                )}
-              </View>
-            </View>
-            <Ionicons name="chevron-forward" size={22} color={C.faint} />
-          </Pressable>
-        );
-      })}
 
       <GhostButton
         label="Add session"
         icon="add"
         color={C.overload}
         onPress={() => setAdding(true)}
-        style={{ marginTop: 6 }}
+        style={{ marginTop: 16 }}
       />
 
       <Sheet visible={adding} onClose={() => setAdding(false)} title="New session">
@@ -158,7 +160,7 @@ function SplitList({ onOpen }: { onOpen: (id: string, edit: boolean) => void }) 
   );
 }
 
-// ───────────────────────── One session: exercises and their sets ─────────────────────────
+// ───────────────────────── One session: each exercise a paragraph ─────────────────────────
 
 function SessionView({ session, startInEdit, onBack }: { session: Session; startInEdit: boolean; onBack: () => void }) {
   const today = useToday();
@@ -182,8 +184,15 @@ function SessionView({ session, startInEdit, onBack }: { session: Session; start
   const total = session.exercises.reduce((n, e) => n + e.sets.length, 0);
   const done = todays ? todays.sets.length : 0;
 
+  const toggleEdit = () => {
+    buzz();
+    setEdit(!edit);
+    setFresh(null);
+  };
+
   return (
     <Screen
+      glow={C.overload}
       left={<IconButton icon="chevron-back" onPress={onBack} label="Back to your split" filled />}
       title={
         edit ? (
@@ -197,24 +206,24 @@ function SessionView({ session, startInEdit, onBack }: { session: Session; start
             maxLength={40}
           />
         ) : (
-          <Text style={[T.title, { fontSize: 26 }]} numberOfLines={1}>
+          <Text style={[T.title, { fontSize: 28 }]} numberOfLines={1}>
             {session.name || 'Session'}
           </Text>
         )
       }
-      subtitle={edit ? undefined : done > 0 ? `Today · ${done} of ${total} sets done` : undefined}
+      subtitle={edit ? undefined : done > 0 ? `Today · ${done} of ${total} sets done` : formatDay(today)}
       right={
-        <Pressable
-          onPress={() => {
-            buzz();
-            setEdit(!edit);
-            setFresh(null);
-          }}
-          accessibilityRole="button"
-          style={[styles.editPill, edit && { backgroundColor: C.overload }]}
-        >
-          <Text style={[styles.editText, edit && { color: C.ink }]}>{edit ? 'Done' : 'Edit'}</Text>
-        </Pressable>
+        edit ? (
+          <Pressable onPress={toggleEdit} accessibilityRole="button" style={[styles.donePill, { backgroundColor: C.overload }]}>
+            <Text style={[styles.editText, { color: '#fff' }]}>Done</Text>
+          </Pressable>
+        ) : (
+          <Pressable onPress={toggleEdit} accessibilityRole="button">
+            <Glass style={styles.editPill} interactive>
+              <Text style={styles.editText}>Edit</Text>
+            </Glass>
+          </Pressable>
+        )
       }
     >
       {session.exercises.length === 0 && !edit ? (
@@ -297,11 +306,11 @@ function SessionView({ session, startInEdit, onBack }: { session: Session; start
           {edit ? (
             <GhostButton
               label="Add set"
-              icon="add"
+              icon="add-circle"
               color={C.overload}
               outlined={false}
               onPress={() => t.addSet(session.id, ex.id)}
-              style={{ alignSelf: 'flex-start', height: 40, paddingHorizontal: 4 }}
+              style={{ alignSelf: 'flex-start', height: 40, paddingHorizontal: 0 }}
             />
           ) : null}
         </Card>
@@ -314,7 +323,7 @@ function SessionView({ session, startInEdit, onBack }: { session: Session; start
             icon="add"
             color={C.overload}
             onPress={() => setFresh(t.addExercise(session.id))}
-            style={{ marginTop: 4 }}
+            style={{ marginTop: 6 }}
           />
           <GhostButton
             label="Delete this session"
@@ -332,12 +341,12 @@ function SessionView({ session, startInEdit, onBack }: { session: Session; start
                 },
               )
             }
-            style={{ marginTop: 18 }}
+            style={{ marginTop: 14 }}
           />
         </>
       ) : session.exercises.length > 0 ? (
-        <Text style={[T.small, { textAlign: 'center', marginTop: 10, lineHeight: 18 }]}>
-          Tap the numbers to change them with the wheel.{'\n'}Tap the circle when a set is done as written.
+        <Text style={[T.small, { textAlign: 'center', marginTop: 8, lineHeight: 18, color: C.faint }]}>
+          Tap a set to change it with the wheel.{'\n'}Tap the circle when it's done as written.
         </Text>
       ) : null}
 
@@ -350,10 +359,10 @@ function SessionView({ session, startInEdit, onBack }: { session: Session; start
               ? `Set ${wheel.index + 1} · starting numbers`
               : wheelLogged
                 ? `Set ${wheel.index + 1} · logged today` +
-                  (wheelLogged.prev ? ` · last time ${formatWeight(wheelLogged.prev.weight)} kg × ${wheelLogged.prev.reps}` : '')
+                  (wheelLogged.prev ? ` · last time ${formatWeight(wheelLogged.prev.weight)}kg – ${wheelLogged.prev.reps}` : '')
                 : isBlank(wheelSet)
                   ? `Set ${wheel.index + 1}`
-                  : `Set ${wheel.index + 1} · last time ${formatWeight(wheelSet.weight)} kg × ${wheelSet.reps}`
+                  : `Set ${wheel.index + 1} · last time ${formatWeight(wheelSet.weight)}kg – ${wheelSet.reps}`
           }
           initial={wheelSet}
           action={edit ? 'Save' : wheelLogged ? 'Update set' : 'Log set'}
@@ -372,6 +381,7 @@ function SessionView({ session, startInEdit, onBack }: { session: Session; start
   );
 }
 
+// One line of the note: "50kg – 10", what changed, and a round tick like Reminders'.
 function SetRow({
   index,
   set,
@@ -392,35 +402,35 @@ function SetRow({
   const change = logged ? compareSet(logged, logged.prev) : null;
   const color = changeColor(change);
   const delta = logged ? describeChange(logged, logged.prev) : '';
+  const tag = delta || (change === 'same' ? 'Same' : '');
   return (
     <View style={styles.setRow}>
-      <Text style={styles.setIndex}>{index + 1}</Text>
+      {edit ? (
+        <Pressable onPress={onRemove} hitSlop={8} accessibilityRole="button" accessibilityLabel={`Remove set ${index + 1}`} style={{ marginRight: 10 }}>
+          <Ionicons name="remove-circle" size={23} color={C.down} />
+        </Pressable>
+      ) : null}
       <Pressable
         onPress={onNumbers}
         accessibilityRole="button"
         accessibilityLabel={`Set ${index + 1}: ${formatWeight(set.weight)} kilos for ${set.reps} reps. Tap to change.`}
-        style={({ pressed }) => [styles.numbers, pressed && { opacity: 0.6 }]}
+        style={({ pressed }) => [styles.numbers, pressed && { backgroundColor: 'rgba(255,255,255,0.08)' }]}
       >
-        <View style={styles.pill}>
-          <Text style={styles.num}>{formatWeight(set.weight)}</Text>
+        <Text style={[styles.setText, isBlank(set) && { color: C.faint }]}>
+          {formatWeight(set.weight)}
           <Text style={styles.unit}>kg</Text>
-        </View>
-        <Text style={styles.times}>×</Text>
-        <View style={styles.pill}>
-          <Text style={styles.num}>{set.reps}</Text>
-          <Text style={styles.unit}>reps</Text>
-        </View>
-      </Pressable>
-      <View style={{ flex: 1, alignItems: 'flex-end', paddingRight: 8 }}>
-        {!edit && logged ? (
-          <Text style={[styles.delta, { color }]} numberOfLines={2}>
-            {delta.replace(' · ', '\n') || (change === 'same' ? 'same' : '')}
-          </Text>
+          <Text style={styles.dash}>{'  –  '}</Text>
+          {set.reps}
+        </Text>
+        {!edit && tag ? (
+          <View style={[styles.tag, { backgroundColor: alpha(color, 0.18) }]}>
+            <Text style={[styles.tagText, { color }]} numberOfLines={1}>
+              {tag}
+            </Text>
+          </View>
         ) : null}
-      </View>
-      {edit ? (
-        <IconButton icon="remove-circle-outline" color={C.down} label={`Remove set ${index + 1}`} onPress={onRemove} />
-      ) : (
+      </Pressable>
+      {edit ? null : (
         <Pressable
           onPress={onTick}
           hitSlop={8}
@@ -429,11 +439,7 @@ function SetRow({
           accessibilityLabel={`Set ${index + 1} done`}
           style={styles.tick}
         >
-          <Ionicons
-            name={logged ? 'checkmark-circle' : 'ellipse-outline'}
-            size={30}
-            color={logged ? color : C.faint}
-          />
+          <Ionicons name={logged ? 'checkmark-circle' : 'ellipse-outline'} size={27} color={logged ? color : C.faint} />
         </Pressable>
       )}
     </View>
@@ -484,73 +490,58 @@ function SetWheelSheet({
 }
 
 const styles = StyleSheet.create({
-  sessionCard: {
-    backgroundColor: C.card,
-    borderRadius: 18,
-    padding: 18,
-    marginBottom: 10,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  sessionName: { color: C.text, fontSize: 22, fontWeight: '800', letterSpacing: -0.3 },
-  sessionStatus: { flexDirection: 'row', alignItems: 'center', gap: 7, marginTop: 8 },
-  dot: { width: 9, height: 9, borderRadius: 5 },
+  sessionName: { color: C.text, fontSize: 19, fontWeight: '600', letterSpacing: -0.4 },
+  sessionStatus: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 6 },
+  dot: { width: 8, height: 8, borderRadius: 4 },
 
   titleInput: {
     minWidth: 0,
     color: C.text,
     fontSize: 22,
-    fontWeight: '800',
+    fontWeight: '700',
     backgroundColor: C.card2,
-    borderRadius: 10,
-    paddingHorizontal: 10,
+    borderRadius: 12,
+    borderCurve: 'continuous',
+    paddingHorizontal: 12,
     height: 44,
   },
-  editPill: {
-    height: 36,
-    paddingHorizontal: 16,
-    borderRadius: 18,
-    backgroundColor: C.card2,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  editText: { color: C.text, fontSize: 15, fontWeight: '700' },
+  editPill: { height: 40, paddingHorizontal: 18, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
+  donePill: { height: 40, paddingHorizontal: 18, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
+  editText: { color: C.text, fontSize: 16, fontWeight: '600' },
 
-  exercise: { marginBottom: 10, paddingVertical: 14, paddingRight: 10 },
-  exName: { color: C.text, fontSize: 18, fontWeight: '700', marginBottom: 6 },
-  exHead: { flexDirection: 'row', alignItems: 'center', marginBottom: 6 },
+  exercise: { marginBottom: 12, paddingTop: 14, paddingBottom: 8, paddingHorizontal: 16 },
+  exName: { color: C.text, fontSize: 19, fontWeight: '600', letterSpacing: -0.4, marginBottom: 4 },
+  exHead: { flexDirection: 'row', alignItems: 'center', marginBottom: 4 },
   exInput: {
     flex: 1,
     minWidth: 0,
     color: C.text,
     fontSize: 17,
-    fontWeight: '700',
+    fontWeight: '600',
     backgroundColor: C.card2,
-    borderRadius: 10,
-    paddingHorizontal: 10,
+    borderRadius: 12,
+    borderCurve: 'continuous',
+    paddingHorizontal: 12,
     height: 42,
     marginRight: 2,
   },
 
-  setRow: { flexDirection: 'row', alignItems: 'center', height: 48 },
-  setIndex: { width: 22, color: C.faint, fontSize: 14, fontWeight: '700', fontVariant: ['tabular-nums'] },
-  numbers: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  pill: {
+  setRow: { flexDirection: 'row', alignItems: 'center', minHeight: 46 },
+  numbers: {
+    flex: 1,
     flexDirection: 'row',
-    alignItems: 'baseline',
-    gap: 4,
-    backgroundColor: C.card2,
-    borderRadius: 10,
-    paddingHorizontal: 11,
-    height: 38,
-    paddingTop: 6,
-    minWidth: 64,
-    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 10,
+    alignSelf: 'stretch',
+    marginLeft: -8,
+    paddingHorizontal: 8,
+    borderRadius: 12,
+    borderCurve: 'continuous',
   },
-  num: { color: C.text, fontSize: 19, fontWeight: '700', fontVariant: ['tabular-nums'] },
-  unit: { color: C.muted, fontSize: 13 },
-  times: { color: C.faint, fontSize: 15 },
-  delta: { fontSize: 13, lineHeight: 16, fontWeight: '700', textAlign: 'right', fontVariant: ['tabular-nums'] },
-  tick: { width: 38, height: 38, alignItems: 'center', justifyContent: 'center' },
+  setText: { color: C.text, fontSize: 19, letterSpacing: -0.3, fontVariant: ['tabular-nums'] },
+  unit: { color: C.muted, fontSize: 17 },
+  dash: { color: C.faint },
+  tag: { borderRadius: 10, paddingHorizontal: 8, paddingVertical: 3, flexShrink: 1 },
+  tagText: { fontSize: 13, fontWeight: '600', fontVariant: ['tabular-nums'] },
+  tick: { width: 40, height: 40, alignItems: 'flex-end', justifyContent: 'center' },
 });

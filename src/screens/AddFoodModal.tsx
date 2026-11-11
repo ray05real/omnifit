@@ -404,14 +404,14 @@ function QuickAdd({
 }
 
 const styles = StyleSheet.create({
-  page: { flex: 1, backgroundColor: C.bg },
+  page: { flex: 1, backgroundColor: C.cardSolid },
   inner: { flex: 1, width: '100%', maxWidth: 500, alignSelf: 'center', paddingHorizontal: PAD, paddingTop: 14 },
   head: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 },
   timeRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    backgroundColor: C.card,
+    backgroundColor: C.card2,
     borderRadius: 12,
     paddingHorizontal: 14,
     height: 48,
@@ -420,7 +420,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    backgroundColor: C.card,
+    backgroundColor: C.card2,
     borderRadius: 12,
     paddingHorizontal: 12,
     height: 46,

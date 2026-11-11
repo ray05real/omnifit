@@ -8,6 +8,9 @@ import { Chart } from '../components/Chart';
 import { WheelColumn, WheelRow, range } from '../components/Wheel';
 import {
   Card,
+  Group,
+  Row,
+  SectionTitle,
   DateStepper,
   Empty,
   GhostButton,
@@ -45,6 +48,7 @@ export const WeightScreen = React.memo(function WeightScreen() {
   return (
     <Screen
       title="Weight"
+      glow={C.weight}
       footer={
         <PrimaryButton
           label={hasToday ? 'Change today’s weight' : 'Log today’s weight'}
@@ -90,7 +94,8 @@ export const WeightScreen = React.memo(function WeightScreen() {
             </Card>
           ) : null}
 
-          <Text style={[T.label, { marginTop: 22, marginBottom: 4 }]}>History</Text>
+          <SectionTitle>History</SectionTitle>
+          <Group>
           {points
             .slice()
             .reverse()
@@ -98,19 +103,14 @@ export const WeightScreen = React.memo(function WeightScreen() {
             .map((p, i, arr) => {
               const older = arr[i + 1];
               return (
-                <Pressable
-                  key={p.date}
-                  onPress={() => setSheet(p.date)}
-                  accessibilityRole="button"
-                  style={({ pressed }) => [styles.row, pressed && { opacity: 0.6 }]}
-                >
+                <Row key={p.date} onPress={() => setSheet(p.date)} last={i === arr.length - 1} chevron>
                   <Text style={[T.body, { flex: 1 }]}>{relativeDay(p.date, today)}</Text>
                   {older ? <Text style={[T.small, T.num, { marginRight: 12 }]}>{delta(p.value, older.value)}</Text> : null}
                   <Text style={styles.rowValue}>{kg(p.value)} kg</Text>
-                  <Ionicons name="chevron-forward" size={16} color={C.faint} />
-                </Pressable>
+                  </Row>
               );
             })}
+          </Group>
         </>
       )}
 
@@ -196,7 +196,7 @@ function WeightSheet({ startDate, today, onClose }: { startDate: DateKey; today:
 
 const styles = StyleSheet.create({
   bigRow: { flexDirection: 'row', alignItems: 'baseline', gap: 6, marginTop: 4, marginBottom: 2 },
-  big: { color: C.text, fontSize: 60, fontWeight: '800', letterSpacing: -2, fontVariant: ['tabular-nums'] },
+  big: { color: C.text, fontSize: 60, fontWeight: '700', letterSpacing: -1, fontVariant: ['tabular-nums'] },
   bigUnit: { color: C.muted, fontSize: 22, fontWeight: '600' },
   row: {
     flexDirection: 'row',

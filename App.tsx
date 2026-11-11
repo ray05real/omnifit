@@ -1,9 +1,10 @@
-// Omnifit: five sections side by side. Swipe left / right between them, or tap the bar at the bottom.
+// Omnifit: five sections side by side. Swipe left / right between them, or tap the floating glass bar.
 
-import React, { useCallback, useEffect, useRef, useState, type ComponentRef } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState, type ComponentRef } from 'react';
 import {
+  Animated,
+  Platform,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -15,23 +16,27 @@ import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 
-import { buzz, type IconName } from './src/components/ui';
+import { Glass } from './src/components/Glass';
+import { buzz, tabBarBottom, type IconName } from './src/components/ui';
 import { MetricsScreen } from './src/screens/MetricsScreen';
 import { NutritionScreen } from './src/screens/NutritionScreen';
 import { OverloadScreen } from './src/screens/OverloadScreen';
 import { SleepScreen } from './src/screens/SleepScreen';
 import { WeightScreen } from './src/screens/WeightScreen';
 import { useHydrated } from './src/store/hooks';
-import { C } from './src/theme';
+import { C, TAB_H } from './src/theme';
 
 // The owner's order: overload, nutrition, weight, sleep, then metrics.
 const TABS: { key: string; label: string; icon: IconName; iconOff: IconName; color: string; Screen: React.ComponentType }[] = [
   { key: 'overload', label: 'Overload', icon: 'barbell', iconOff: 'barbell-outline', color: C.overload, Screen: OverloadScreen },
   { key: 'nutrition', label: 'Nutrition', icon: 'restaurant', iconOff: 'restaurant-outline', color: C.nutrition, Screen: NutritionScreen },
   { key: 'weight', label: 'Weight', icon: 'scale', iconOff: 'scale-outline', color: C.weight, Screen: WeightScreen },
-  { key: 'sleep', label: 'Sleep', icon: 'moon', iconOff: 'moon-outline', color: C.sleep, Screen: SleepScreen },
-  { key: 'metrics', label: 'Metrics', icon: 'stats-chart', iconOff: 'stats-chart-outline', color: C.text, Screen: MetricsScreen },
+  { key: 'sleep', label: 'Sleep', icon: 'moon', iconOff: 'moon-outline', color: '#7D7AFF', Screen: SleepScreen },
+  { key: 'metrics', label: 'Metrics', icon: 'calendar', iconOff: 'calendar-outline', color: C.text, Screen: MetricsScreen },
 ];
+
+const BAR_SIDE = 20; // the bar's gap from each side of the screen
+const BAR_PAD = 4;
 
 export default function App() {
   return (
@@ -47,11 +52,23 @@ function Root() {
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const pageW = Math.min(width, 500); // a phone-wide column in the PC's web preview
-  const pager = useRef<ComponentRef<typeof ScrollView>>(null);
+  const pager = useRef<ComponentRef<typeof Animated.ScrollView>>(null);
   const [index, setIndex] = useState(0);
   const indexRef = useRef(0);
-
   const tapped = useRef<number | null>(null); // the section a tap on the bar is gliding to
+  const scrollX = useRef(new Animated.Value(0)).current;
+
+  const tabW = (pageW - BAR_SIDE * 2 - BAR_PAD * 2) / TABS.length;
+  // The lighter pill under the current section follows the finger while swiping.
+  const pillX = useMemo(
+    () =>
+      scrollX.interpolate({
+        inputRange: [0, pageW * (TABS.length - 1)],
+        outputRange: [0, tabW * (TABS.length - 1)],
+        extrapolate: 'clamp' as const,
+      }),
+    [scrollX, pageW, tabW],
+  );
 
   const onScroll = useCallback(
     (e: NativeSyntheticEvent<NativeScrollEvent>) => {
@@ -67,6 +84,15 @@ function Root() {
       }
     },
     [pageW],
+  );
+
+  const scrollHandler = useMemo(
+    () =>
+      Animated.event([{ nativeEvent: { contentOffset: { x: scrollX } } }], {
+        useNativeDriver: Platform.OS !== 'web',
+        listener: onScroll,
+      }),
+    [scrollX, onScroll],
   );
 
   const go = useCallback(
@@ -91,7 +117,7 @@ function Root() {
   return (
     <View style={styles.app}>
       <View style={[styles.column, { width: pageW }]}>
-        <ScrollView
+        <Animated.ScrollView
           ref={pager}
           horizontal
           pagingEnabled
@@ -101,7 +127,7 @@ function Root() {
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="on-drag"
           scrollEventThrottle={16}
-          onScroll={onScroll}
+          onScroll={scrollHandler}
           onScrollBeginDrag={() => {
             tapped.current = null;
           }}
@@ -112,25 +138,30 @@ function Root() {
               <t.Screen />
             </View>
           ))}
-        </ScrollView>
+        </Animated.ScrollView>
 
-        <View style={[styles.tabBar, { paddingBottom: Math.max(insets.bottom, 8) }]}>
-          {TABS.map((t, i) => {
-            const on = i === index;
-            return (
-              <Pressable
-                key={t.key}
-                onPress={() => go(i)}
-                style={styles.tab}
-                accessibilityRole="tab"
-                accessibilityState={{ selected: on }}
-                accessibilityLabel={t.label}
-              >
-                <Ionicons name={on ? t.icon : t.iconOff} size={24} color={on ? t.color : C.faint} />
-                <Text style={[styles.tabLabel, { color: on ? t.color : C.faint }]}>{t.label}</Text>
-              </Pressable>
-            );
-          })}
+        <View style={[styles.barWrap, { bottom: tabBarBottom(insets) }]} pointerEvents="box-none">
+          <Glass style={styles.bar}>
+            <Animated.View pointerEvents="none" style={[styles.pill, { width: tabW, transform: [{ translateX: pillX }] }]} />
+            {TABS.map((t, i) => {
+              const on = i === index;
+              return (
+                <Pressable
+                  key={t.key}
+                  onPress={() => go(i)}
+                  style={styles.tab}
+                  accessibilityRole="tab"
+                  accessibilityState={{ selected: on }}
+                  accessibilityLabel={t.label}
+                >
+                  <Ionicons name={on ? t.icon : t.iconOff} size={23} color={on ? t.color : C.text} />
+                  <Text style={[styles.tabLabel, { color: on ? t.color : C.text }]} numberOfLines={1}>
+                    {t.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </Glass>
         </View>
       </View>
     </View>
@@ -140,13 +171,22 @@ function Root() {
 const styles = StyleSheet.create({
   app: { flex: 1, backgroundColor: C.bg, alignItems: 'center' },
   column: { flex: 1, backgroundColor: C.bg },
-  tabBar: {
+  barWrap: { position: 'absolute', left: BAR_SIDE, right: BAR_SIDE },
+  bar: {
+    height: TAB_H,
+    borderRadius: TAB_H / 2,
     flexDirection: 'row',
-    paddingTop: 8,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: C.line,
-    backgroundColor: C.bg,
+    alignItems: 'center',
+    paddingHorizontal: BAR_PAD,
   },
-  tab: { flex: 1, alignItems: 'center', gap: 3 },
-  tabLabel: { fontSize: 10.5, fontWeight: '600' },
+  pill: {
+    position: 'absolute',
+    left: BAR_PAD,
+    top: BAR_PAD,
+    bottom: BAR_PAD,
+    borderRadius: (TAB_H - BAR_PAD * 2) / 2,
+    backgroundColor: 'rgba(255,255,255,0.13)',
+  },
+  tab: { flex: 1, height: TAB_H - BAR_PAD * 2, alignItems: 'center', justifyContent: 'center', gap: 2 },
+  tabLabel: { fontSize: 10, fontWeight: '600', letterSpacing: -0.1 },
 });

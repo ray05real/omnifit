@@ -76,10 +76,19 @@ Overload · Nutrition · Weight · Sleep · Metrics.
   Go; before the owner relies on it daily, give it a backup / export and install it as its own app (a
   development build needs the Apple Developer account, £79/yr; the owner's To Do app was sideloaded instead:
   ask which they prefer).
-- Look: dark, one colour per section (Overload orange `#FF6A3D`, Nutrition green `#34D17B`, Weight blue
-  `#4DA3FF`, Sleep purple `#9B7BFF`); protein violet (not red or pink: it sits next to the red "over"), carbs
-  blue, fat yellow; up green / same amber / down red. System font, big tabular numbers. All tokens in
-  `src/theme.ts`.
+- **Look: like one of Apple's own iPhone apps (the owner, 11 Nov 2026: "imagine Apple added these features to
+  their own apps").** Apple's dark-mode system colours (black background, `#1C1C1E` cards with a faint glass
+  edge, a soft glow of the section's colour at the top of each page); one colour per section (Overload
+  systemOrange, Nutrition systemGreen, Weight systemBlue, Sleep systemIndigo); protein purple, carbs cyan, fat
+  yellow; up green / same yellow / down red. Large titles, San Francisco, rounded continuous corners, grouped
+  lists (Settings style), capsule buttons, Apple's segmented control. **Glass** (Liquid Glass on iOS 26, a blur
+  elsewhere; `src/components/Glass.tsx`) for what floats: the tab bar (a floating capsule like Instagram's, the
+  current section in a lighter pill that follows the finger while swiping), the round buttons, the Edit button.
+  Sheets float with big rounded corners (iOS 26). Rings as Apple's Activity rings (dimmed own-colour track).
+  The Metrics calendar is Apple's Calendar month view (month name big, year red, hairlines between weeks, today
+  red, the chosen day in a white circle) with our marks under each date. Graphs as Apple Health (scale on the
+  right, dashed grid). **Overload sessions look like the owner's Notes** (their screenshot): each exercise its own
+  paragraph (card), each set a plain line "50kg – 10", minimal. All tokens in `src/theme.ts`.
 
 ## Tech
 - **Expo SDK 58** (the version the App Store's Expo Go runs; re-check before upgrading), React Native,

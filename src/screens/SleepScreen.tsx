@@ -8,6 +8,9 @@ import { Ring } from '../components/Ring';
 import { WheelColumn, WheelRow, range } from '../components/Wheel';
 import {
   Card,
+  Group,
+  Row,
+  SectionTitle,
   DateStepper,
   Empty,
   GhostButton,
@@ -47,6 +50,7 @@ export const SleepScreen = React.memo(function SleepScreen() {
   return (
     <Screen
       title="Sleep"
+      glow={C.sleep}
       footer={
         <PrimaryButton
           label={lastNight === undefined ? 'Log last night’s sleep' : 'Change last night’s sleep'}
@@ -57,7 +61,7 @@ export const SleepScreen = React.memo(function SleepScreen() {
       }
     >
       <Card style={{ alignItems: 'center', marginTop: 6, paddingTop: 20 }}>
-        <Ring size={190} stroke={15} progress={lastNight === undefined ? 0 : lastNight / goal} color={C.sleep}>
+        <Ring size={200} stroke={20} progress={lastNight === undefined ? 0 : lastNight / goal} color={C.sleep}>
           <Text style={T.label}>Last night</Text>
           <Text style={styles.big}>{lastNight === undefined ? '–' : formatDuration(lastNight)}</Text>
           <Text style={T.muted}>{lastNight === undefined ? 'not logged yet' : `of ${formatDuration(goal)}`}</Text>
@@ -78,27 +82,21 @@ export const SleepScreen = React.memo(function SleepScreen() {
         </View>
       </Card>
 
-      <Text style={[T.label, { marginTop: 22, marginBottom: 4 }]}>History</Text>
+      <SectionTitle>History</SectionTitle>
       {points.length === 0 ? (
         <Empty icon="moon-outline" title="No sleep logged yet" text="Each morning, tap the button below and put in how long you slept." />
       ) : (
-        points
+        <Group>{points
           .slice()
           .reverse()
           .slice(0, 90)
-          .map((p) => (
-            <Pressable
-              key={p.date}
-              onPress={() => setSheet(p.date)}
-              accessibilityRole="button"
-              style={({ pressed }) => [styles.row, pressed && { opacity: 0.6 }]}
-            >
+          .map((p, i, arr) => (
+            <Row key={p.date} onPress={() => setSheet(p.date)} last={i === arr.length - 1} chevron>
               <View style={[styles.dot, { backgroundColor: sleepColor(sleepStatus(p.value, goal)) }]} />
               <Text style={[T.body, { flex: 1 }]}>{nightLabel(p.date, today)}</Text>
               <Text style={styles.rowValue}>{formatDuration(p.value)}</Text>
-              <Ionicons name="chevron-forward" size={16} color={C.faint} />
-            </Pressable>
-          ))
+              </Row>
+          ))}</Group>
       )}
 
       <GhostButton
@@ -211,10 +209,10 @@ function GoalSheet({ onClose }: { onClose: () => void }) {
 }
 
 const styles = StyleSheet.create({
-  big: { color: C.text, fontSize: 34, fontWeight: '800', letterSpacing: -0.8, marginVertical: 2, fontVariant: ['tabular-nums'] },
+  big: { color: C.text, fontSize: 34, fontWeight: '700', letterSpacing: -0.5, marginVertical: 2, fontVariant: ['tabular-nums'] },
   stats: { flexDirection: 'row', alignSelf: 'stretch', marginTop: 20, gap: 10 },
   stat: { flex: 1, backgroundColor: C.card2, borderRadius: 14, padding: 12 },
-  statValue: { color: C.text, fontSize: 20, fontWeight: '800', marginTop: 4, marginBottom: 2, fontVariant: ['tabular-nums'] },
+  statValue: { color: C.text, fontSize: 20, fontWeight: '700', marginTop: 4, marginBottom: 2, fontVariant: ['tabular-nums'] },
   row: {
     flexDirection: 'row',
     alignItems: 'center',

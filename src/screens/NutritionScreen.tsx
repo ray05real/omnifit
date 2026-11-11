@@ -7,6 +7,9 @@ import { Ring } from '../components/Ring';
 import { TimeWheels } from '../components/Wheel';
 import {
   Card,
+  Group,
+  Row,
+  SectionTitle,
   DateStepper,
   Empty,
   Field,
@@ -75,6 +78,7 @@ export const NutritionScreen = React.memo(function NutritionScreen() {
   return (
     <Screen
       title="Nutrition"
+      glow={C.nutrition}
       right={<IconButton icon="options-outline" label="Daily goals" filled onPress={() => setGoalsOpen(true)} />}
       footer={
         <PrimaryButton
@@ -96,7 +100,7 @@ export const NutritionScreen = React.memo(function NutritionScreen() {
       />
 
       <Card style={{ alignItems: 'center', marginTop: 14, paddingTop: 20 }}>
-        <Ring size={200} stroke={16} progress={total.kcal / goals.kcal} color={ringColor}>
+        <Ring size={210} stroke={22} progress={total.kcal / goals.kcal} color={ringColor}>
           <Text style={styles.bigNum}>{thousands(total.kcal)}</Text>
           <Text style={T.muted}>of {thousands(goals.kcal)} kcal</Text>
           <Text style={[styles.leftText, { color: status === 'none' ? C.muted : ringColor }]}>{leftText}</Text>
@@ -117,31 +121,28 @@ export const NutritionScreen = React.memo(function NutritionScreen() {
         </Pressable>
       ) : null}
 
-      <Text style={[T.label, { marginTop: 22, marginBottom: 4 }]}>Food log</Text>
+      <SectionTitle>Food log</SectionTitle>
       {dayEntries.length === 0 ? (
         <Empty icon="restaurant-outline" title="Nothing logged" text="Tap Log food to add what you ate or drank." />
       ) : (
-        dayEntries.map((e) => (
-          <Pressable
-            key={e.id}
-            onPress={() => setEditing(e)}
-            accessibilityRole="button"
-            style={({ pressed }) => [styles.entry, pressed && { opacity: 0.6 }]}
-          >
-            <Text style={styles.time}>{e.time}</Text>
-            <View style={{ flex: 1 }}>
-              <Text style={[T.body, { fontWeight: '600' }]} numberOfLines={1}>
-                {e.name}
-              </Text>
-              <Text style={[T.small, { marginTop: 2 }]} numberOfLines={1}>
-                {e.amount && e.unit ? amountLabel(e.amount, e.unit) + ' · ' : ''}P {round1(e.protein)} · C{' '}
-                {round1(e.carbs)} · F {round1(e.fat)}
-              </Text>
-            </View>
-            <Text style={styles.entryKcal}>{thousands(e.kcal)}</Text>
-            <Text style={T.small}>kcal</Text>
-          </Pressable>
-        ))
+        <Group>
+          {dayEntries.map((e, i) => (
+            <Row key={e.id} onPress={() => setEditing(e)} last={i === dayEntries.length - 1}>
+              <Text style={styles.time}>{e.time}</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={T.body} numberOfLines={1}>
+                  {e.name}
+                </Text>
+                <Text style={[T.small, { marginTop: 2 }]} numberOfLines={1}>
+                  {e.amount && e.unit ? amountLabel(e.amount, e.unit) + ' · ' : ''}P {round1(e.protein)} · C{' '}
+                  {round1(e.carbs)} · F {round1(e.fat)}
+                </Text>
+              </View>
+              <Text style={styles.entryKcal}>{thousands(e.kcal)}</Text>
+              <Text style={T.small}>kcal</Text>
+            </Row>
+          ))}
+        </Group>
       )}
 
       <AddFoodModal key={addKey} visible={adding} date={day} onClose={() => setAdding(false)} />
@@ -154,7 +155,7 @@ export const NutritionScreen = React.memo(function NutritionScreen() {
 function MacroRing({ label, value, goal, color }: { label: string; value: number; goal: number; color: string }) {
   return (
     <View style={{ alignItems: 'center', flex: 1 }}>
-      <Ring size={62} stroke={7} progress={goal > 0 ? value / goal : 0} color={color}>
+      <Ring size={66} stroke={9} progress={goal > 0 ? value / goal : 0} color={color}>
         <Text style={styles.macroPct}>{goal > 0 ? Math.round((value / goal) * 100) : 0}%</Text>
       </Ring>
       <Text style={[T.small, { marginTop: 8, color, fontWeight: '700' }]}>{label}</Text>
@@ -270,7 +271,7 @@ function GoalsSheet({ onClose }: { onClose: () => void }) {
 }
 
 const styles = StyleSheet.create({
-  bigNum: { color: C.text, fontSize: 44, fontWeight: '800', letterSpacing: -1, fontVariant: ['tabular-nums'] },
+  bigNum: { color: C.text, fontSize: 46, fontWeight: '700', letterSpacing: -0.5, fontVariant: ['tabular-nums'] },
   leftText: { fontSize: 14, fontWeight: '700', marginTop: 6 },
   macros: { flexDirection: 'row', marginTop: 22, alignSelf: 'stretch' },
   macroPct: { color: C.text, fontSize: 13, fontWeight: '700', fontVariant: ['tabular-nums'] },
@@ -278,10 +279,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginTop: 12,
-    padding: 14,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: C.nutrition,
+    padding: 16,
+    borderRadius: 22,
+    borderCurve: 'continuous',
+    backgroundColor: 'rgba(48,209,88,0.16)',
   },
   entry: {
     flexDirection: 'row',
@@ -291,6 +292,6 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: C.line,
   },
-  time: { width: 50, color: C.muted, fontSize: 14, fontWeight: '600', fontVariant: ['tabular-nums'] },
-  entryKcal: { color: C.text, fontSize: 17, fontWeight: '700', fontVariant: ['tabular-nums'] },
+  time: { width: 48, color: C.muted, fontSize: 15, fontVariant: ['tabular-nums'] },
+  entryKcal: { color: C.text, fontSize: 17, fontWeight: '600', fontVariant: ['tabular-nums'] },
 });
