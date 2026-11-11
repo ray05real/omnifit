@@ -31,7 +31,7 @@ const TABS: { key: string; label: string; icon: IconName; iconOff: IconName; col
   { key: 'overload', label: 'Overload', icon: 'barbell', iconOff: 'barbell-outline', color: C.overload, Screen: OverloadScreen },
   { key: 'nutrition', label: 'Nutrition', icon: 'restaurant', iconOff: 'restaurant-outline', color: C.nutrition, Screen: NutritionScreen },
   { key: 'weight', label: 'Weight', icon: 'scale', iconOff: 'scale-outline', color: C.weight, Screen: WeightScreen },
-  { key: 'sleep', label: 'Sleep', icon: 'moon', iconOff: 'moon-outline', color: '#7D7AFF', Screen: SleepScreen },
+  { key: 'sleep', label: 'Sleep', icon: 'moon', iconOff: 'moon-outline', color: C.sleep, Screen: SleepScreen },
   { key: 'metrics', label: 'Metrics', icon: 'calendar', iconOff: 'calendar-outline', color: C.text, Screen: MetricsScreen },
 ];
 
@@ -154,8 +154,8 @@ function Root() {
                   accessibilityState={{ selected: on }}
                   accessibilityLabel={t.label}
                 >
-                  <Ionicons name={on ? t.icon : t.iconOff} size={23} color={on ? t.color : C.text} />
-                  <Text style={[styles.tabLabel, { color: on ? t.color : C.text }]} numberOfLines={1}>
+                  <Ionicons name={on ? t.icon : t.iconOff} size={23} color={on ? C.text : C.muted} />
+                  <Text style={[styles.tabLabel, { color: on ? C.text : C.muted }]} numberOfLines={1}>
                     {t.label}
                   </Text>
                 </Pressable>

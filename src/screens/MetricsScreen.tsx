@@ -191,7 +191,7 @@ function CalendarView({ metric, color, today }: { metric: Metric; color: string;
           }}
         >
           <Text style={styles.monthName}>
-            {monthTitle(ym.y, ym.m).split(' ')[0]} <Text style={{ color: C.today }}>{ym.y}</Text>
+            {monthTitle(ym.y, ym.m).split(' ')[0]} <Text style={{ color: C.muted }}>{ym.y}</Text>
           </Text>
           <Text style={[T.small, { marginTop: 2 }]}>{summary}</Text>
         </Pressable>
@@ -250,13 +250,13 @@ function CalendarView({ metric, color, today }: { metric: Metric; color: string;
               accessibilityRole="button"
               accessibilityLabel={formatDay(date)}
             >
-              <View style={[styles.numWrap, isSel && { backgroundColor: isToday ? C.today : C.text }]}>
+              <View style={[styles.numWrap, isToday && { backgroundColor: C.thumb }, isSel && { backgroundColor: C.text }]}>
                 <Text
                   style={[
                     styles.dayNum,
                     { color: future ? C.faint : C.text },
-                    isToday && { color: C.today, fontWeight: '600' },
-                    isSel && { color: isToday ? '#fff' : C.ink, fontWeight: '600' },
+                    isToday && { fontWeight: '700' },
+                    isSel && { color: C.ink, fontWeight: '700' },
                   ]}
                 >
                   {dayNum}

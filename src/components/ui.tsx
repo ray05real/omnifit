@@ -65,8 +65,8 @@ function Glow({ color }: { color: string }) {
     <Svg style={styles.glow} width="100%" height={520} pointerEvents="none">
       <Defs>
         <RadialGradient id={id} cx="50%" cy="0%" rx="85%" ry="100%" fx="50%" fy="0%">
-          <Stop offset="0" stopColor={color} stopOpacity={0.34} />
-          <Stop offset="0.6" stopColor={color} stopOpacity={0.12} />
+          <Stop offset="0" stopColor={color} stopOpacity={0.13} />
+          <Stop offset="0.6" stopColor={color} stopOpacity={0.04} />
           <Stop offset="1" stopColor={color} stopOpacity={0} />
         </RadialGradient>
       </Defs>

@@ -76,6 +76,9 @@ Overload · Nutrition · Weight · Sleep · Metrics.
   Go; before the owner relies on it daily, give it a backup / export and install it as its own app (a
   development build needs the Apple Developer account, £79/yr; the owner's To Do app was sideloaded instead:
   ask which they prefer).
+- **Colours (the owner, 11 Nov 2026: "too many colours, stick to a palette", look at MacroFactor): black,
+  white and greys only; green = good (went up, goal reached), grey = the same / not there yet, red = went down /
+  too much. No colour per section, no colour per macro.** (The section colours below are retired.)
 - **Look: like one of Apple's own iPhone apps (the owner, 11 Nov 2026: "imagine Apple added these features to
   their own apps").** Apple's dark-mode system colours (black background, `#1C1C1E` cards with a faint glass
   edge, a soft glow of the section's colour at the top of each page); one colour per section (Overload

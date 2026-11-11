@@ -18,26 +18,29 @@ export const C = {
   faint: 'rgba(235,235,245,0.3)', // tertiaryLabel
   ink: '#000000', // text on a white button
 
-  overload: '#FF9F0A', // systemOrange
-  nutrition: '#30D158', // systemGreen
-  weight: '#0A84FF', // systemBlue
-  sleep: '#5E5CE6', // systemIndigo
-  today: '#FF453A', // systemRed, as in Apple's Calendar
+  // One small palette (the owner, 11 Nov 2026: "too many colours", look at MacroFactor): the app itself is
+  // black, white and greys; colour is kept for meaning only: green = good (went up, goal reached),
+  // grey = the same / not there yet, red = went down / too much. The sections no longer have colours of their own.
+  overload: '#FFFFFF',
+  nutrition: '#FFFFFF',
+  weight: '#FFFFFF',
+  sleep: '#FFFFFF',
+  today: '#FFFFFF',
 
-  protein: '#BF5AF2', // systemPurple (not red: it sits next to the red "over")
-  carbs: '#64D2FF', // systemCyan
-  fat: '#FFD60A', // systemYellow
+  protein: '#FFFFFF',
+  carbs: '#FFFFFF',
+  fat: '#FFFFFF',
 
-  up: '#30D158',
-  same: '#FFD60A',
-  down: '#FF453A',
+  up: '#30D158', // systemGreen
+  same: '#8E8E93', // systemGray
+  down: '#FF453A', // systemRed
 };
 
 export function changeColor(c: Change | null): string {
   if (c === 'up') return C.up;
   if (c === 'same') return C.same;
   if (c === 'down') return C.down;
-  return C.overload;
+  return C.text; // logged, nothing to compare yet
 }
 
 // A colour at a given opacity: '#FF9F0A' + 0.2 → 'rgba(255,159,10,0.2)'. Apple's tinted buttons and ring tracks.

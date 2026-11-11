@@ -59,7 +59,8 @@ export const NutritionScreen = React.memo(function NutritionScreen() {
   const [goalsOpen, setGoalsOpen] = useState(false);
 
   const status = dayStatus(total.kcal, goals.kcal);
-  const ringColor = status === 'over' ? C.down : C.nutrition;
+  // Green once the goal is reached, red if well over, white on the way there (MacroFactor: no colour for "not yet").
+  const ringColor = status === 'over' ? C.down : status === 'hit' ? C.up : C.text;
   const left = goals.kcal - total.kcal;
   const leftText =
     status === 'over'
@@ -155,7 +156,7 @@ export const NutritionScreen = React.memo(function NutritionScreen() {
 function MacroRing({ label, value, goal, color }: { label: string; value: number; goal: number; color: string }) {
   return (
     <View style={{ alignItems: 'center', flex: 1 }}>
-      <Ring size={66} stroke={9} progress={goal > 0 ? value / goal : 0} color={color}>
+      <Ring size={66} stroke={9} progress={goal > 0 ? value / goal : 0} color={goal > 0 && value >= goal * 0.95 ? C.up : color}>
         <Text style={styles.macroPct}>{goal > 0 ? Math.round((value / goal) * 100) : 0}%</Text>
       </Ring>
       <Text style={[T.small, { marginTop: 8, color, fontWeight: '700' }]}>{label}</Text>
@@ -282,7 +283,7 @@ const styles = StyleSheet.create({
     padding: 16,
     borderRadius: 22,
     borderCurve: 'continuous',
-    backgroundColor: 'rgba(48,209,88,0.16)',
+    backgroundColor: C.fill,
   },
   entry: {
     flexDirection: 'row',
