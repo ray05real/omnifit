@@ -23,6 +23,7 @@ import Svg, { Defs, RadialGradient, Rect, Stop } from 'react-native-svg';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 
+import { usePageLock } from '../store/pageLock';
 import { C, PAD, RADIUS, T, TAB_H, alpha } from '../theme';
 import { Glass } from './Glass';
 
@@ -95,6 +96,7 @@ export function Screen({
 }) {
   const insets = useSafeAreaInsets();
   const space = tabBarSpace(insets);
+  const locked = usePageLock((s) => s.locked);
   return (
     <View style={{ flex: 1 }}>
       {glow ? <Glow color={glow} /> : null}
@@ -119,6 +121,7 @@ export function Screen({
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
           automaticallyAdjustKeyboardInsets
+          scrollEnabled={!locked}
         >
           {children}
         </ScrollView>
@@ -140,12 +143,14 @@ export function Group({ children, style }: { children: React.ReactNode; style?: 
 export function Row({
   children,
   onPress,
+  onLongPress,
   last,
   chevron,
   style,
 }: {
   children: React.ReactNode;
   onPress?: () => void;
+  onLongPress?: () => void;
   last?: boolean;
   chevron?: boolean;
   style?: StyleProp<ViewStyle>;
@@ -153,6 +158,8 @@ export function Row({
   return (
     <Pressable
       onPress={onPress}
+      onLongPress={onLongPress}
+      delayLongPress={350}
       disabled={!onPress}
       accessibilityRole={onPress ? 'button' : undefined}
       style={({ pressed }) => [styles.row, pressed && { backgroundColor: 'rgba(255,255,255,0.08)' }]}

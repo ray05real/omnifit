@@ -93,6 +93,15 @@ Overload · Nutrition · Weight · Sleep · Metrics.
   right, dashed grid). **Overload sessions look like the owner's Notes** (their screenshot): each exercise its own
   paragraph (card), each set a plain line "50kg – 10", minimal. All tokens in `src/theme.ts`.
 
+- **Overload details (the owner, 14 Nov 2026):** press and hold a session in the split, then **drag** it to
+  reorder (`src/components/DragList.tsx`; arrows were tried and rejected). In a session the **weight and the
+  reps are two separate things to tap**, each opening its own wheel. Exercise cards are compact, with the
+  proportions of the owner's Notes page (17pt text, lines about 30pt apart).
+- **Testing is by sideloaded .ipa now** (the owner, 14 Nov 2026), same as the To Do app: every push to GitHub
+  builds an unsigned .ipa on GitHub's Mac (`.github/workflows/build.yml`) and publishes it as a Release; the
+  owner signs it in Kravasigner. The repository is public for that (free Mac builds, a direct download link).
+  Latest build: https://github.com/ray05real/omnifit/releases/latest/download/Omnifit.ipa
+
 ## Tech
 - **Expo SDK 58** (the version the App Store's Expo Go runs; re-check before upgrading), React Native,
   TypeScript. No router: one screen with a horizontal pager for the five tabs (`App.tsx`), sheets as modals.

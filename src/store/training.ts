@@ -18,6 +18,7 @@ type State = {
   addSession: (name: string) => string;
   renameSession: (id: string, name: string) => void;
   deleteSession: (id: string) => void;
+  moveSession: (from: number, to: number) => void;
   addExercise: (sessionId: string) => string;
   renameExercise: (sessionId: string, exId: string, name: string) => void;
   deleteExercise: (sessionId: string, exId: string) => void;
@@ -54,6 +55,15 @@ export const useTraining = create<State>()(
 
       // The workouts already logged stay in the history (they keep the session's name).
       deleteSession: (id) => set((st) => ({ sessions: st.sessions.filter((s) => s.id !== id) })),
+
+      moveSession: (from, to) =>
+        set((st) => {
+          if (from === to || from < 0 || to < 0 || from >= st.sessions.length || to >= st.sessions.length) return st;
+          const sessions = st.sessions.slice();
+          const [moved] = sessions.splice(from, 1);
+          sessions.splice(to, 0, moved);
+          return { sessions };
+        }),
 
       addExercise: (sessionId) => {
         const id = uid();

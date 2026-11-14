@@ -24,6 +24,7 @@ import { OverloadScreen } from './src/screens/OverloadScreen';
 import { SleepScreen } from './src/screens/SleepScreen';
 import { WeightScreen } from './src/screens/WeightScreen';
 import { useHydrated } from './src/store/hooks';
+import { usePageLock } from './src/store/pageLock';
 import { C, TAB_H } from './src/theme';
 
 // The owner's order: overload, nutrition, weight, sleep, then metrics.
@@ -49,6 +50,7 @@ export default function App() {
 
 function Root() {
   const hydrated = useHydrated();
+  const locked = usePageLock((s) => s.locked);
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const pageW = Math.min(width, 500); // a phone-wide column in the PC's web preview
@@ -121,6 +123,7 @@ function Root() {
           ref={pager}
           horizontal
           pagingEnabled
+          scrollEnabled={!locked}
           bounces={false}
           directionalLockEnabled
           showsHorizontalScrollIndicator={false}
