@@ -99,9 +99,23 @@ Overload · Nutrition · Weight · Sleep · Metrics.
   it "feels AI generated"): plain paragraphs with one very thin line between exercises, compact, with the
   proportions of the owner's Notes page (17pt text, lines about 30pt apart).
 - **Testing is by sideloaded .ipa now** (the owner, 14 Nov 2026), same as the To Do app: every push to GitHub
-  builds an unsigned .ipa on GitHub's Mac (`.github/workflows/build.yml`) and publishes it as a Release; the
-  owner signs it in Kravasigner. The repository is public for that (free Mac builds, a direct download link).
-  Latest build: https://github.com/ray05real/omnifit/releases/latest/download/Omnifit.ipa
+  builds unsigned .ipa files on GitHub's Macs (`.github/workflows/build.yml`) and publishes them as a Release;
+  the owner signs them in Kravasigner. The repository is public for that (free Mac builds, direct links).
+- **Two versions, always built together from the same code (the owner, 14 Nov 2026):**
+  - **Standard** (`Omnifit.ipa`): weight logged by hand, **no Bluetooth at all** (the library isn't even linked).
+    This is the one for other people and, one day, the App Store.
+    https://github.com/ray05real/omnifit/releases/latest/download/Omnifit.ipa
+  - **With scale** (`Omnifit-Scale.ipa`): the owner's own, adds "Weigh with my scale" on the Weight page for
+    their **Renpho ES-28ML** (ES-30M hardware, the "QN" family).
+    https://github.com/ray05real/omnifit/releases/latest/download/Omnifit-Scale.ipa
+  `variant.json` (`{"scale": false}` in the repository; the build writes `true` for the scale version) is read by
+  `app.config.js` (Bluetooth permission + plugin), `react-native.config.js` (leaves the library out) and the
+  Weight page. Same app name and identifier, so either installs over the other and keeps the data.
+- **The scale (not yet confirmed working on the owner's phone):** Renpho publishes nothing; the messages come
+  from openScale's notes on the QN / ES-30M scales. `src/lib/qnScale.ts` is the conversation (tested against
+  openScale's sample messages), `src/scale/scale.ts` the Bluetooth part (react-native-ble-plx),
+  `src/screens/ScaleSheet.tsx` the sheet. It can only be tried with the owner's scale: the sheet has **"Send a
+  report"** (everything seen and said); ask the owner to paste it when it fails, and fix from that.
 
 ## Tech
 - **Expo SDK 58** (the version the App Store's Expo Go runs; re-check before upgrading), React Native,

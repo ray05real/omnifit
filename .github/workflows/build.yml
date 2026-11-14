@@ -1,6 +1,10 @@
-# Builds Omnifit on one of GitHub's Macs every time a change is saved to GitHub, and publishes an unsigned .ipa
-# (Releases on the repository's page). The sideloading app (Kravasigner) signs it with the owner's certificate.
-# Same method as the owner's To Do app. The repository is public so GitHub's Mac builds and the download link are free.
+# Builds Omnifit on GitHub's Macs every time a change is saved to GitHub, and publishes unsigned .ipa files
+# (Releases on the repository's page). The sideloading app (Kravasigner) signs them with the owner's certificate.
+# Same method as the owner's To Do app. The repository is public so the Mac builds and the download links are free.
+#
+# Two versions are built from the same code, always together, so both stay up to date:
+#   Omnifit.ipa        the standard app: weight logged by hand, no Bluetooth (for other people / the App Store)
+#   Omnifit-Scale.ipa  the owner's own: adds weighing with their Renpho Bluetooth scale
 name: Build the .ipa
 
 on:
@@ -15,6 +19,14 @@ jobs:
   build:
     runs-on: xcode-27
     timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - file: Omnifit
+            scale: false
+          - file: Omnifit-Scale
+            scale: true
     env:
       HOMEBREW_NO_AUTO_UPDATE: 1
     steps:
@@ -37,8 +49,15 @@ jobs:
       - name: Install the app's packages
         run: npm ci
 
+      - name: Choose the version (with or without the Bluetooth scale)
+        run: |
+          echo '{ "scale": ${{ matrix.scale }} }' > variant.json
+          cat variant.json
+
       - name: Make the Xcode project (Expo prebuild, installs the pods)
-        run: npx expo prebuild --platform ios --clean
+        run: |
+          npx expo prebuild --platform ios --clean
+          echo "Bluetooth library in this build:"; grep -c "react-native-ble-plx" ios/Podfile.lock || true
 
       - name: Build (unsigned)
         run: |
@@ -55,23 +74,49 @@ jobs:
           # The build number, so each install shows which build it is.
           /usr/libexec/PlistBuddy -c "Set :CFBundleVersion ${{ github.run_number }}" Payload/Omnifit.app/Info.plist
           /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString 0.${{ github.run_number }}" Payload/Omnifit.app/Info.plist
-          zip -qry Omnifit.ipa Payload
-          ls -lh Omnifit.ipa
+          zip -qry "${{ matrix.file }}.ipa" Payload
+          ls -lh "${{ matrix.file }}.ipa"
 
-      - name: Publish the .ipa
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.file }}
+          path: ${{ matrix.file }}.ipa
+
+      - name: Keep the log of a failed build
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.file }}-build-log
+          path: build.log
+
+  # Publishes whichever versions built, as one Release with both files.
+  publish:
+    needs: build
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: out
+          merge-multiple: true
+
+      - run: ls -lh out
+
+      - name: Publish the .ipa files
         uses: softprops/action-gh-release@v2
         with:
           tag_name: build-${{ github.run_number }}
           name: Build ${{ github.run_number }}
           body: ${{ github.event.head_commit.message }}
-          files: Omnifit.ipa
-          make_latest: true
+          files: out/*.ipa
+          fail_on_unmatched_files: true
+          make_latest: ${{ needs.build.result == 'success' && 'true' || 'false' }}
 
       - name: Publish the log of a failed build
-        if: failure()
+        if: failure() || needs.build.result != 'success'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: build-log
           name: Last failed build's log
           prerelease: true
-          files: build.log
+          files: out/build.log

@@ -1,4 +1,5 @@
-// Weight: one entry a day, typed in with the wheel.
+// Weight: one entry a day, typed in with the wheel. In the owner's "with scale" version (variant.json) it can
+// also come straight from their Bluetooth scale.
 
 import React, { useEffect, useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
@@ -14,6 +15,7 @@ import {
   DateStepper,
   Empty,
   GhostButton,
+  IconButton,
   PrimaryButton,
   Screen,
   Sheet,
@@ -25,6 +27,8 @@ import { addDays, formatDay, relativeDay, type DateKey } from '../lib/dates';
 import { useBody } from '../store/body';
 import { useToday } from '../store/hooks';
 import { C, T } from '../theme';
+import variant from '../../variant.json';
+import { ScaleSheet } from './ScaleSheet';
 
 const kg = (v: number) => v.toFixed(1);
 
@@ -40,6 +44,7 @@ export const WeightScreen = React.memo(function WeightScreen() {
   const points = useMemo(() => toPoints(weights), [weights]);
   const smooth = useMemo(() => trend(points), [points]);
   const [sheet, setSheet] = useState<DateKey | null>(null);
+  const [weighing, setWeighing] = useState(false);
 
   const latest = points[points.length - 1];
   const before = points[points.length - 2];
@@ -49,6 +54,11 @@ export const WeightScreen = React.memo(function WeightScreen() {
     <Screen
       title="Weight"
       glow={C.weight}
+      right={
+        variant.scale ? (
+          <IconButton icon="bluetooth" label="Weigh with my scale" filled onPress={() => setWeighing(true)} />
+        ) : undefined
+      }
       footer={
         <PrimaryButton
           label={hasToday ? 'Change today’s weight' : 'Log today’s weight'}
@@ -123,6 +133,16 @@ export const WeightScreen = React.memo(function WeightScreen() {
         style={{ marginTop: 10 }}
       />
 
+      {variant.scale ? (
+        <GhostButton
+          label="Weigh with my scale"
+          icon="bluetooth"
+          onPress={() => setWeighing(true)}
+          style={{ marginTop: 10 }}
+        />
+      ) : null}
+
+      {weighing ? <ScaleSheet today={today} onClose={() => setWeighing(false)} /> : null}
       {sheet ? <WeightSheet startDate={sheet} today={today} onClose={() => setSheet(null)} /> : null}
     </Screen>
   );
