@@ -109,13 +109,16 @@ Overload · Nutrition · Weight · Sleep · Metrics.
   proportions of the owner's Notes page (17pt text, lines about 30pt apart).
 - **More Overload (the owner, 14 Nov 2026):** exercises inside a session reorder the same way as sessions
   (press and hold anywhere on the exercise that isn't a button, then drag; in Edit a ≡ handle shows where).
-  It doesn't auto-scroll yet while dragging past the edge of the screen. **Cardio** can be added next to
+  It doesn't auto-scroll yet while dragging past the edge of the screen. **Swipe right inside a session goes
+  back to the split** (the pager is pulled past its left edge; `backSwipe` in `src/store/pageLock.ts`). **Cardio** can be added next to
   exercises (Edit → "+ Cardio"): a name (Bike, Rower…) and lines of **time – watts** ("20min – 150W"); the
   second number can be switched in Edit to km, kcal or level. Same wheels, ticks and up / same / down
   (more time or more watts = up; if they go opposite ways, minutes × watts decides).
 - **Round + button, bottom right** (the owner, 14 Nov 2026) on Nutrition, Weight and Sleep instead of the wide
-  button, to leave room for the lists. **Nutrition's card is compact and carries the date**: swipe the card
-  sideways (or tap its small arrows) to change day, tap the date to come back to today; no separate date bar.
+  button, to leave room for the lists. **Nutrition's card (the owner, 14 Nov 2026):** everything at its original
+  size (the date bar with its arrows above the card, the 210 calorie ring, 66 macro rings), but the three macro
+  rings are **stacked to the right of the calorie ring** to save height. (A smaller card that carried the date
+  and was swiped between days was tried and rejected: "too small, I liked it before".)
   **Tapping a logged food edits all of it in one place** (name, amount, calories, macros, time; delete).
 - **Testing is by sideloaded .ipa now** (the owner, 14 Nov 2026), same as the To Do app: every push to GitHub
   builds unsigned .ipa files on GitHub's Macs (`.github/workflows/build.yml`) and publishes them as a Release;

@@ -3,7 +3,7 @@
 // for its wheel; press and hold a session or an exercise, then drag, to reorder; exercises only change after
 // tapping Edit.
 
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -41,6 +41,7 @@ import {
   type Workout,
 } from '../lib/overload';
 import { useToday } from '../store/hooks';
+import { backSwipe } from '../store/pageLock';
 import { useTraining, type Exercise, type Session } from '../store/training';
 import { C, T, alpha, changeColor } from '../theme';
 import variant from '../../variant.json';
@@ -183,6 +184,14 @@ function SessionView({ session, startInEdit, onBack }: { session: Session; start
 
   const workouts = useTraining((s) => s.workouts);
   const t = useTraining.getState(); // the actions never change
+
+  // Swiping right (pulling the page past its left edge) goes back to the split, like the arrow.
+  useEffect(() => {
+    backSwipe.handler = onBack;
+    return () => {
+      backSwipe.handler = null;
+    };
+  }, [onBack]);
 
   const todays = useMemo(
     () => workouts.find((w) => w.date === today && w.sessionId === session.id),

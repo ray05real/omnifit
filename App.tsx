@@ -24,7 +24,7 @@ import { OverloadScreen } from './src/screens/OverloadScreen';
 import { SleepScreen } from './src/screens/SleepScreen';
 import { WeightScreen } from './src/screens/WeightScreen';
 import { useHydrated } from './src/store/hooks';
-import { usePageLock } from './src/store/pageLock';
+import { backSwipe, usePageLock } from './src/store/pageLock';
 import { C, TAB_H } from './src/theme';
 
 // The owner's order: overload, nutrition, weight, sleep, then metrics.
@@ -124,7 +124,8 @@ function Root() {
           horizontal
           pagingEnabled
           scrollEnabled={!locked}
-          bounces={false}
+          // The page may be pulled a little past the first section: that pull is the "swipe back" out of a session.
+          bounces
           directionalLockEnabled
           showsHorizontalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
@@ -133,6 +134,12 @@ function Root() {
           onScroll={scrollHandler}
           onScrollBeginDrag={() => {
             tapped.current = null;
+          }}
+          onScrollEndDrag={(e: NativeSyntheticEvent<NativeScrollEvent>) => {
+            if (e.nativeEvent.contentOffset.x < -40 && backSwipe.handler) {
+              buzz();
+              backSwipe.handler();
+            }
           }}
           style={{ flex: 1 }}
         >
