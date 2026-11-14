@@ -115,10 +115,10 @@ Overload · Nutrition · Weight · Sleep · Metrics.
   second number can be switched in Edit to km, kcal or level. Same wheels, ticks and up / same / down
   (more time or more watts = up; if they go opposite ways, minutes × watts decides).
 - **Round + button, bottom right** (the owner, 14 Nov 2026) on Nutrition, Weight and Sleep instead of the wide
-  button, to leave room for the lists. **Nutrition's card (the owner, 14 Nov 2026):** everything at its original
-  size (the date bar with its arrows above the card, the 210 calorie ring, 66 macro rings), but the three macro
-  rings are **stacked to the right of the calorie ring** to save height. (A smaller card that carried the date
-  and was swiped between days was tried and rejected: "too small, I liked it before".)
+  button, to leave room for the lists. **Nutrition's card (the owner's final word, 14 Nov 2026):** the card
+  carries the date (no separate date bar): swipe the card sideways, or tap its small arrows, to change day; tap
+  the date to come back to today. Inside, everything is **full size** (210 calorie ring, 66 macro rings; a
+  shrunk version "looked too small") with the three macro rings **stacked to the right of the calorie ring**.
   **Tapping a logged food edits all of it in one place** (name, amount, calories, macros, time; delete).
 - **Testing is by sideloaded .ipa now** (the owner, 14 Nov 2026), same as the To Do app: every push to GitHub
   builds unsigned .ipa files on GitHub's Macs (`.github/workflows/build.yml`) and publishes them as a Release;
