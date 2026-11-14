@@ -1,4 +1,4 @@
-// Omnifit: five sections side by side. Swipe left / right between them, or tap the floating glass bar.
+// Omniload: five sections side by side. Swipe left / right between them, or tap the floating glass bar.
 
 import React, { useCallback, useEffect, useMemo, useRef, useState, type ComponentRef } from 'react';
 import {

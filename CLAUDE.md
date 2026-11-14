@@ -1,9 +1,15 @@
-# Omnifit — project brief
+# Omniload — project brief
 
-Read this first in every session. Omnifit is a separate app from Pollz (which lives in
+Read this first in every session. Omniload is a separate app from Pollz (which lives in
 `Documents/pollz-starter`): don't mix the two projects' code, data or plans.
 
-"Omnifit" is a working name for now.
+**The app is called Omniload** (the owner's pick, 14 Nov 2026: "Omnifit" was already taken on the App Store;
+Omniload = the "omni" of the old name + progressive overload; no app with that name showed in the UK / US App
+Store search, but only App Store Connect can confirm it is free). The folder, the GitHub repository
+(`ray05real/omnifit`), the app identifier (`com.omnifit.app`, kept so installing over the old app keeps its data)
+and the storage keys still say "omnifit": leave them.
+**Logo:** an "O" that is also a weight plate and a ring filling up, white on black with the last stretch green
+(`node scripts/make-icon.js` redraws `assets/icon.png` and friends; no design tool needed).
 
 ## Who you are working with
 - The owner has **no coding experience**. Explain each step in plain English, one step at a time.
@@ -16,7 +22,7 @@ Read this first in every session. Omnifit is a separate app from Pollz (which li
 - Keep costs near zero: free tiers first. Say clearly before anything would cost money.
 - After each milestone, ask them to test on the phone and report what's wrong before moving on.
 
-## What Omnifit is (the owner's brief, 11 Nov 2026)
+## What Omniload is (the owner's brief, 11 Nov 2026)
 A personal gym companion for the owner (a bodybuilder / regular gym goer), built on the three things that
 matter: **progressive overload, nutrition and sleep**. Overload and nutrition are the focus (they are the most
 controllable); sleep and body weight are simple manual logs. **Keep everything simple**: the owner said so
@@ -115,12 +121,15 @@ Overload · Nutrition · Weight · Sleep · Metrics.
   builds unsigned .ipa files on GitHub's Macs (`.github/workflows/build.yml`) and publishes them as a Release;
   the owner signs them in Kravasigner. The repository is public for that (free Mac builds, direct links).
 - **Two versions, always built together from the same code (the owner, 14 Nov 2026):**
-  - **Standard** (`Omnifit.ipa`): weight logged by hand, **no Bluetooth at all** (the library isn't even linked).
+  - **Standard** (`Omniload.ipa`): weight logged by hand, **no Bluetooth at all** (the library isn't even linked).
     This is the one for other people and, one day, the App Store.
-    https://github.com/ray05real/omnifit/releases/latest/download/Omnifit.ipa
-  - **With scale** (`Omnifit-Scale.ipa`): the owner's own, adds "Weigh with my scale" on the Weight page for
+    https://github.com/ray05real/omnifit/releases/latest/download/Omniload.ipa
+  - **With scale** (`Omniload-Scale.ipa`): the owner's own, adds "Weigh with my scale" on the Weight page for
     their **Renpho ES-28ML** (ES-30M hardware, the "QN" family).
-    https://github.com/ray05real/omnifit/releases/latest/download/Omnifit-Scale.ipa
+    https://github.com/ray05real/omnifit/releases/latest/download/Omniload-Scale.ipa
+  The build number is written into `variant.json` too and shown under the split on the Overload page
+  ("Omniload · build 6"), so the owner can tell which build is installed; new builds are listed at
+  https://github.com/ray05real/omnifit/releases.
   `variant.json` (`{"scale": false}` in the repository; the build writes `true` for the scale version) is read by
   `app.config.js` (Bluetooth permission + plugin), `react-native.config.js` (leaves the library out) and the
   Weight page. Same app name and identifier, so either installs over the other and keeps the data.

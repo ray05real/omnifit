@@ -43,6 +43,7 @@ import {
 import { useToday } from '../store/hooks';
 import { useTraining, type Exercise, type Session } from '../store/training';
 import { C, T, alpha, changeColor } from '../theme';
+import variant from '../../variant.json';
 
 const CHANGE_WORD = { up: 'went up', same: 'stayed the same', down: 'went down', first: 'first time logged' };
 const METRIC_WORD: Record<CardioMetric, string> = { W: 'watts', km: 'distance', kcal: 'calories', level: 'level' };
@@ -149,6 +150,9 @@ function SplitList({ onOpen }: { onOpen: (id: string, edit: boolean) => void }) 
       )}
 
       <GhostButton label="Add session" icon="add" color={C.text} onPress={() => setAdding(true)} style={{ marginTop: 16 }} />
+
+      {/* Which build is installed (written in by the GitHub build). */}
+      <Text style={styles.build}>Omniload · {variant.build > 0 ? `build ${variant.build}` : 'preview'}</Text>
 
       <Sheet visible={adding} onClose={() => setAdding(false)} title="New session">
         <Field
@@ -602,6 +606,7 @@ const styles = StyleSheet.create({
   sessionName: { color: C.text, fontSize: 19, fontWeight: '600', letterSpacing: -0.4 },
   sessionStatus: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 6 },
   dot: { width: 8, height: 8, borderRadius: 4 },
+  build: { color: C.faint, fontSize: 12, textAlign: 'center', marginTop: 28 },
 
   titleInput: {
     minWidth: 0,

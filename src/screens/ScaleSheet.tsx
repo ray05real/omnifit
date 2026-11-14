@@ -10,12 +10,13 @@ import type { DateKey } from '../lib/dates';
 import { startWeighing, type ScaleStatus } from '../scale/scale';
 import { useBody } from '../store/body';
 import { C, T } from '../theme';
+import variant from '../../variant.json';
 
 const MESSAGE: Record<ScaleStatus, { title: string; text: string }> = {
   starting: { title: 'Getting ready', text: 'Turning on Bluetooth…' },
   unavailable: { title: 'Bluetooth isn’t available', text: 'This version of the app can’t use Bluetooth here.' },
   'bluetooth-off': { title: 'Bluetooth is off', text: 'Turn Bluetooth on (Control Centre), then come back.' },
-  'not-allowed': { title: 'Bluetooth isn’t allowed', text: 'Open Settings → Omnifit and switch Bluetooth on.' },
+  'not-allowed': { title: 'Bluetooth isn’t allowed', text: 'Open Settings → Omniload and switch Bluetooth on.' },
   looking: { title: 'Step on the scale', text: 'Looking for your scale. Stepping on wakes it up.' },
   connecting: { title: 'Found it', text: 'Connecting… stay on the scale.' },
   weighing: { title: 'Weighing', text: 'Stand still until the number settles.' },
@@ -32,7 +33,7 @@ export function ScaleSheet({ today, onClose }: { today: DateKey; onClose: () => 
   const report = useRef<string[]>([]);
 
   useEffect(() => {
-    report.current = [`Omnifit scale report, ${new Date().toISOString()}`];
+    report.current = [`Omniload scale report, build ${variant.build}, ${new Date().toISOString()}`];
     setStatus('starting');
     setKg(null);
     return startWeighing({

@@ -1,10 +1,10 @@
-# Builds Omnifit on GitHub's Macs every time a change is saved to GitHub, and publishes unsigned .ipa files
+# Builds Omniload on GitHub's Macs every time a change is saved to GitHub, and publishes unsigned .ipa files
 # (Releases on the repository's page). The sideloading app (Kravasigner) signs them with the owner's certificate.
 # Same method as the owner's To Do app. The repository is public so the Mac builds and the download links are free.
 #
 # Two versions are built from the same code, always together, so both stay up to date:
-#   Omnifit.ipa        the standard app: weight logged by hand, no Bluetooth (for other people / the App Store)
-#   Omnifit-Scale.ipa  the owner's own: adds weighing with their Renpho Bluetooth scale
+#   Omniload.ipa        the standard app: weight logged by hand, no Bluetooth (for other people / the App Store)
+#   Omniload-Scale.ipa  the owner's own: adds weighing with their Renpho Bluetooth scale
 name: Build the .ipa
 
 on:
@@ -23,9 +23,9 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - file: Omnifit
+          - file: Omniload
             scale: false
-          - file: Omnifit-Scale
+          - file: Omniload-Scale
             scale: true
     env:
       HOMEBREW_NO_AUTO_UPDATE: 1
@@ -51,7 +51,7 @@ jobs:
 
       - name: Choose the version (with or without the Bluetooth scale)
         run: |
-          echo '{ "scale": ${{ matrix.scale }} }' > variant.json
+          echo '{ "scale": ${{ matrix.scale }}, "build": ${{ github.run_number }} }' > variant.json
           cat variant.json
 
       - name: Make the Xcode project (Expo prebuild, installs the pods)
@@ -63,17 +63,17 @@ jobs:
         run: |
           set -o pipefail
           brew install xcbeautify
-          xcodebuild -workspace ios/Omnifit.xcworkspace -scheme Omnifit -configuration Release -sdk iphoneos \
+          xcodebuild -workspace ios/Omniload.xcworkspace -scheme Omniload -configuration Release -sdk iphoneos \
             -derivedDataPath "$PWD/build" CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
             build 2>&1 | tee build.log | xcbeautify --renderer github-actions
 
       - name: Pack the .ipa
         run: |
           mkdir Payload
-          cp -R build/Build/Products/Release-iphoneos/Omnifit.app Payload/
+          cp -R build/Build/Products/Release-iphoneos/Omniload.app Payload/
           # The build number, so each install shows which build it is.
-          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion ${{ github.run_number }}" Payload/Omnifit.app/Info.plist
-          /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString 0.${{ github.run_number }}" Payload/Omnifit.app/Info.plist
+          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion ${{ github.run_number }}" Payload/Omniload.app/Info.plist
+          /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString 0.${{ github.run_number }}" Payload/Omniload.app/Info.plist
           zip -qry "${{ matrix.file }}.ipa" Payload
           ls -lh "${{ matrix.file }}.ipa"
 
