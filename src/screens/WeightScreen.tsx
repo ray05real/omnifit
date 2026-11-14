@@ -53,23 +53,16 @@ export const WeightScreen = React.memo(function WeightScreen() {
   return (
     <Screen
       title="Weight"
-      glow={C.weight}
+      glow={C.glowWeight}
       right={
         variant.scale ? (
           <IconButton icon="bluetooth" label="Weigh with my scale" filled onPress={() => setWeighing(true)} />
         ) : undefined
       }
-      footer={
-        <PrimaryButton
-          label={hasToday ? 'Change today’s weight' : 'Log today’s weight'}
-          icon={hasToday ? 'create-outline' : 'add'}
-          color={C.weight}
-          onPress={() => setSheet(today)}
-        />
-      }
+      fab={{ icon: 'add', label: hasToday ? 'Change today’s weight' : 'Log today’s weight', onPress: () => setSheet(today) }}
     >
       {!latest ? (
-        <Empty icon="scale-outline" title="No weight logged yet" text="Weigh yourself and tap the button below. Same time each day works best." />
+        <Empty icon="scale-outline" title="No weight logged yet" text="Weigh yourself and tap +. Same time each day works best." />
       ) : (
         <>
           <Card style={{ marginTop: 6 }}>

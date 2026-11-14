@@ -79,6 +79,9 @@ Overload · Nutrition · Weight · Sleep · Metrics.
 - **Colours (the owner, 11 Nov 2026: "too many colours, stick to a palette", look at MacroFactor): black,
   white and greys only; green = good (went up, goal reached), grey = the same / not there yet, red = went down /
   too much. No colour per section, no colour per macro.** (The section colours below are retired.)
+  **One exception (the owner, 14 Nov 2026, "test the colour theory"): the soft glow at the top of each page is
+  coloured:** Overload purple, Nutrition green, Weight yellow, Sleep blue (purple and blue kept well apart),
+  Metrics grey and quieter. Nothing else takes the section's colour.
 - **Look: like one of Apple's own iPhone apps (the owner, 11 Nov 2026: "imagine Apple added these features to
   their own apps").** Apple's dark-mode system colours (black background, `#1C1C1E` cards with a faint glass
   edge, a soft glow of the section's colour at the top of each page); one colour per section (Overload
@@ -98,6 +101,16 @@ Overload · Nutrition · Weight · Sleep · Metrics.
   reps are two separate things to tap**, each opening its own wheel. **No card behind an exercise** (the owner:
   it "feels AI generated"): plain paragraphs with one very thin line between exercises, compact, with the
   proportions of the owner's Notes page (17pt text, lines about 30pt apart).
+- **More Overload (the owner, 14 Nov 2026):** exercises inside a session reorder the same way as sessions
+  (press and hold anywhere on the exercise that isn't a button, then drag; in Edit a ≡ handle shows where).
+  It doesn't auto-scroll yet while dragging past the edge of the screen. **Cardio** can be added next to
+  exercises (Edit → "+ Cardio"): a name (Bike, Rower…) and lines of **time – watts** ("20min – 150W"); the
+  second number can be switched in Edit to km, kcal or level. Same wheels, ticks and up / same / down
+  (more time or more watts = up; if they go opposite ways, minutes × watts decides).
+- **Round + button, bottom right** (the owner, 14 Nov 2026) on Nutrition, Weight and Sleep instead of the wide
+  button, to leave room for the lists. **Nutrition's card is compact and carries the date**: swipe the card
+  sideways (or tap its small arrows) to change day, tap the date to come back to today; no separate date bar.
+  **Tapping a logged food edits all of it in one place** (name, amount, calories, macros, time; delete).
 - **Testing is by sideloaded .ipa now** (the owner, 14 Nov 2026), same as the To Do app: every push to GitHub
   builds unsigned .ipa files on GitHub's Macs (`.github/workflows/build.yml`) and publishes them as a Release;
   the owner signs them in Kravasigner. The repository is public for that (free Mac builds, direct links).

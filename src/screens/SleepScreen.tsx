@@ -50,15 +50,8 @@ export const SleepScreen = React.memo(function SleepScreen() {
   return (
     <Screen
       title="Sleep"
-      glow={C.sleep}
-      footer={
-        <PrimaryButton
-          label={lastNight === undefined ? 'Log last night’s sleep' : 'Change last night’s sleep'}
-          icon={lastNight === undefined ? 'add' : 'create-outline'}
-          color={C.sleep}
-          onPress={() => setSheet(today)}
-        />
-      }
+      glow={C.glowSleep}
+      fab={{ icon: 'add', label: lastNight === undefined ? 'Log last night’s sleep' : 'Change last night’s sleep', onPress: () => setSheet(today) }}
     >
       <Card style={{ alignItems: 'center', marginTop: 6, paddingTop: 20 }}>
         <Ring size={200} stroke={20} progress={lastNight === undefined ? 0 : lastNight / goal} color={C.sleep}>
@@ -84,7 +77,7 @@ export const SleepScreen = React.memo(function SleepScreen() {
 
       <SectionTitle>History</SectionTitle>
       {points.length === 0 ? (
-        <Empty icon="moon-outline" title="No sleep logged yet" text="Each morning, tap the button below and put in how long you slept." />
+        <Empty icon="moon-outline" title="No sleep logged yet" text="Each morning, tap + and put in how long you slept." />
       ) : (
         <Group>{points
           .slice()

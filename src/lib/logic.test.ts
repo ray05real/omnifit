@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { addDays, agoLabel, daysBetween, formatDay, fromKey, monthGrid, relativeDay, toKey } from './dates.ts';
-import { compareSet, dayChange, describeChange, formatWeight, splitWeight, topSet, type LoggedSet } from './overload.ts';
+import { compareSet, dayChange, describeChange, formatMinutes, formatWeight, setLabel, splitWeight, topSet, type LoggedSet } from './overload.ts';
 import { dayStatus, macroKcal, parseNum, proteinHit, scale, sum, thousands } from './nutrition.ts';
 import { formatDuration, hours1, sleepStatus, toPoints, trend } from './body.ts';
 
@@ -69,6 +69,24 @@ test('overload: labels and the wheel', () => {
   assert.deepEqual(splitWeight(82.5), { whole: 82, quarter: 0.5 });
   assert.deepEqual(splitWeight(79.99), { whole: 80, quarter: 0 });
   assert.deepEqual(topSet([{ weight: 80, reps: 8 }, { weight: 85, reps: 5 }, { weight: 85, reps: 6 }]), { weight: 85, reps: 6 });
+});
+
+test('overload: cardio is minutes and watts', () => {
+  const prev = { weight: 20, reps: 150 };
+  assert.equal(compareSet({ weight: 25, reps: 150 }, prev, 'cardio'), 'up');
+  assert.equal(compareSet({ weight: 20, reps: 140 }, prev, 'cardio'), 'down');
+  assert.equal(compareSet({ weight: 20, reps: 150 }, prev, 'cardio'), 'same');
+  // Shorter but harder: the work done (minutes × watts) decides. 15 × 210 = 3150 against 3000.
+  assert.equal(compareSet({ weight: 15, reps: 210 }, prev, 'cardio'), 'up');
+  assert.equal(compareSet({ weight: 15, reps: 180 }, prev, 'cardio'), 'down');
+  assert.equal(formatMinutes(20), '20');
+  assert.equal(formatMinutes(20.5), '20:30');
+  assert.equal(formatMinutes(0.25), '0:15');
+  assert.equal(setLabel({ weight: 20.5, reps: 150 }, 'cardio', 'W'), '20:30min – 150W');
+  assert.equal(setLabel({ weight: 30, reps: 8 }, 'cardio', 'level'), '30min – lvl 8');
+  assert.equal(setLabel({ weight: 50, reps: 10 }), '50kg – 10');
+  assert.equal(describeChange({ weight: 25, reps: 160 }, prev, 'cardio', 'W'), '+5 min · +10 W');
+  assert.equal(describeChange({ weight: 19.5, reps: 150 }, prev, 'cardio', 'W'), '−0:30 min');
 });
 
 test('nutrition: amounts, totals and the day', () => {

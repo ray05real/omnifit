@@ -4,11 +4,12 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
 import type { DateKey } from '../lib/dates';
-import { isBlank, type SetVal, type Workout } from '../lib/overload';
+import { isBlank, type CardioMetric, type ExerciseKind, type SetVal, type Workout } from '../lib/overload';
 import { phoneStorage, uid } from './persist';
 
 // An exercise's sets always show the last numbers done, like the owner's notes.
-export type Exercise = { id: string; name: string; sets: SetVal[] };
+// A cardio exercise (bike, rower…) keeps minutes in `weight` and its metric (watts by default) in `reps`.
+export type Exercise = { id: string; name: string; sets: SetVal[]; kind?: ExerciseKind; metric?: CardioMetric };
 export type Session = { id: string; name: string; exercises: Exercise[] };
 
 type State = {
@@ -19,10 +20,11 @@ type State = {
   renameSession: (id: string, name: string) => void;
   deleteSession: (id: string) => void;
   moveSession: (from: number, to: number) => void;
-  addExercise: (sessionId: string) => string;
+  addExercise: (sessionId: string, kind?: ExerciseKind) => string;
+  setMetric: (sessionId: string, exId: string, metric: CardioMetric) => void;
   renameExercise: (sessionId: string, exId: string, name: string) => void;
   deleteExercise: (sessionId: string, exId: string) => void;
-  moveExercise: (sessionId: string, exId: string, dir: -1 | 1) => void;
+  moveExercise: (sessionId: string, from: number, to: number) => void;
   addSet: (sessionId: string, exId: string) => void;
   removeSet: (sessionId: string, exId: string, index: number, today: DateKey) => void;
   // Edit mode: change a set's numbers without logging a workout.
@@ -31,6 +33,11 @@ type State = {
   logSet: (sessionId: string, exId: string, index: number, val: SetVal, date: DateKey) => void;
   unlogSet: (sessionId: string, exId: string, index: number, date: DateKey) => void;
 };
+
+// What a logged set remembers about the kind of exercise it was (nothing extra for strength).
+function kindOf(ex: Exercise): { kind?: ExerciseKind; metric?: CardioMetric } {
+  return ex.kind === 'cardio' ? { kind: 'cardio', metric: ex.metric ?? 'W' } : {};
+}
 
 function mapExercise(sessions: Session[], sessionId: string, exId: string, fn: (e: Exercise) => Exercise): Session[] {
   return sessions.map((s) =>
@@ -65,18 +72,21 @@ export const useTraining = create<State>()(
           return { sessions };
         }),
 
-      addExercise: (sessionId) => {
+      addExercise: (sessionId, kind = 'strength') => {
         const id = uid();
         const blank = (): SetVal => ({ weight: 0, reps: 0 });
+        const exercise: Exercise =
+          kind === 'cardio'
+            ? { id, name: '', sets: [blank()], kind: 'cardio', metric: 'W' }
+            : { id, name: '', sets: [blank(), blank(), blank()] };
         set((st) => ({
-          sessions: st.sessions.map((s) =>
-            s.id !== sessionId
-              ? s
-              : { ...s, exercises: [...s.exercises, { id, name: '', sets: [blank(), blank(), blank()] }] },
-          ),
+          sessions: st.sessions.map((s) => (s.id !== sessionId ? s : { ...s, exercises: [...s.exercises, exercise] })),
         }));
         return id;
       },
+
+      setMetric: (sessionId, exId, metric) =>
+        set((st) => ({ sessions: mapExercise(st.sessions, sessionId, exId, (e) => ({ ...e, metric })) })),
 
       renameExercise: (sessionId, exId, name) =>
         set((st) => ({ sessions: mapExercise(st.sessions, sessionId, exId, (e) => ({ ...e, name })) })),
@@ -88,15 +98,14 @@ export const useTraining = create<State>()(
           ),
         })),
 
-      moveExercise: (sessionId, exId, dir) =>
+      moveExercise: (sessionId, from, to) =>
         set((st) => ({
           sessions: st.sessions.map((s) => {
             if (s.id !== sessionId) return s;
-            const i = s.exercises.findIndex((e) => e.id === exId);
-            const j = i + dir;
-            if (i < 0 || j < 0 || j >= s.exercises.length) return s;
+            if (from === to || from < 0 || to < 0 || from >= s.exercises.length || to >= s.exercises.length) return s;
             const exercises = s.exercises.slice();
-            [exercises[i], exercises[j]] = [exercises[j], exercises[i]];
+            const [moved] = exercises.splice(from, 1);
+            exercises.splice(to, 0, moved);
             return { ...s, exercises };
           }),
         })),
@@ -158,7 +167,7 @@ export const useTraining = create<State>()(
           const si = w.sets.findIndex((s) => s.exerciseId === exId && s.setIndex === index);
           if (si >= 0) {
             // Changing a set already logged today: what it's compared with stays the last time's numbers.
-            w.sets[si] = { ...w.sets[si], exerciseName: ex.name, weight: val.weight, reps: val.reps };
+            w.sets[si] = { ...w.sets[si], exerciseName: ex.name, weight: val.weight, reps: val.reps, ...kindOf(ex) };
           } else {
             w.sets.push({
               exerciseId: exId,
@@ -167,6 +176,7 @@ export const useTraining = create<State>()(
               weight: val.weight,
               reps: val.reps,
               prev: isBlank(before) ? null : { ...before },
+              ...kindOf(ex),
             });
           }
           workouts[wi] = w;

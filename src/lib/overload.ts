@@ -4,6 +4,17 @@ import type { DateKey } from './dates.ts';
 
 export type SetVal = { weight: number; reps: number };
 
+// Cardio (bike, rower…) is logged with the same two numbers: `weight` holds the minutes and `reps` the
+// machine's number (watts by default; or distance, calories, level).
+export type ExerciseKind = 'strength' | 'cardio';
+export type CardioMetric = 'W' | 'km' | 'kcal' | 'level';
+export const CARDIO_METRICS: { key: CardioMetric; label: string }[] = [
+  { key: 'W', label: 'Watts' },
+  { key: 'km', label: 'Km' },
+  { key: 'kcal', label: 'Kcal' },
+  { key: 'level', label: 'Level' },
+];
+
 // 'first' = nothing to compare with yet.
 export type Change = 'up' | 'same' | 'down' | 'first';
 
@@ -15,6 +26,8 @@ export type LoggedSet = {
   weight: number;
   reps: number;
   prev: SetVal | null;
+  kind?: ExerciseKind; // missing = strength
+  metric?: CardioMetric;
 };
 
 export type Workout = {
@@ -34,20 +47,22 @@ export function e1rm(s: SetVal): number {
   return s.weight * (1 + s.reps / 30);
 }
 
-export function compareSet(now: SetVal, prev: SetVal | null): Change {
+export function compareSet(now: SetVal, prev: SetVal | null, kind: ExerciseKind = 'strength'): Change {
   if (isBlank(prev) || !prev) return 'first';
   if (now.weight === prev.weight && now.reps === prev.reps) return 'same';
   if (now.weight >= prev.weight && now.reps >= prev.reps) return 'up';
   if (now.weight <= prev.weight && now.reps <= prev.reps) return 'down';
-  const a = e1rm(now);
-  const b = e1rm(prev);
+  // One number went up and the other down: strength goes by the estimated one-rep max, cardio by the work
+  // done (minutes × watts).
+  const a = kind === 'cardio' ? now.weight * now.reps : e1rm(now);
+  const b = kind === 'cardio' ? prev.weight * prev.reps : e1rm(prev);
   if (Math.abs(a - b) < 0.01) return 'same';
   return a > b ? 'up' : 'down';
 }
 
 export function tally(sets: LoggedSet[]): Record<Change, number> {
   const t: Record<Change, number> = { up: 0, same: 0, down: 0, first: 0 };
-  for (const s of sets) t[compareSet(s, s.prev)]++;
+  for (const s of sets) t[compareSet(s, s.prev, s.kind)]++;
   return t;
 }
 
@@ -67,16 +82,35 @@ export function formatWeight(w: number): string {
   return String(Math.round(w * 100) / 100);
 }
 
+// Minutes as the gym machines show them: 20, or 20:30 for twenty and a half.
+export function formatMinutes(m: number): string {
+  const whole = Math.floor(m + 1e-9);
+  const sec = Math.round((m - whole) * 60);
+  return sec === 0 ? String(whole) : whole + ':' + (sec < 10 ? '0' + sec : sec);
+}
+
+// A set as one line of text: '50kg – 10' or '20min – 150W'.
+export function setLabel(s: SetVal, kind: ExerciseKind = 'strength', metric: CardioMetric = 'W'): string {
+  if (kind !== 'cardio') return formatWeight(s.weight) + 'kg – ' + s.reps;
+  const v = formatWeight(s.reps);
+  return formatMinutes(s.weight) + 'min – ' + (metric === 'level' ? 'lvl ' + v : v + metric);
+}
+
 function signed(n: number, unit: string): string {
   return (n > 0 ? '+' : '−') + formatWeight(Math.abs(n)) + unit;
 }
 
 // '+2.5 kg', '−1 rep', '+2.5 kg · −2 reps'; '' when nothing changed or there's nothing to compare.
-export function describeChange(now: SetVal, prev: SetVal | null): string {
+export function describeChange(now: SetVal, prev: SetVal | null, kind: ExerciseKind = 'strength', metric: CardioMetric = 'W'): string {
   if (isBlank(prev) || !prev) return '';
   const parts: string[] = [];
   const dw = now.weight - prev.weight;
   const dr = now.reps - prev.reps;
+  if (kind === 'cardio') {
+    if (dw !== 0) parts.push((dw > 0 ? '+' : '−') + formatMinutes(Math.abs(dw)) + ' min');
+    if (dr !== 0) parts.push(signed(dr, ' ' + (metric === 'level' ? 'lvl' : metric)));
+    return parts.join(' · ');
+  }
   if (dw !== 0) parts.push(signed(dw, ' kg'));
   if (dr !== 0) parts.push(signed(dr, Math.abs(dr) === 1 ? ' rep' : ' reps'));
   return parts.join(' · ');

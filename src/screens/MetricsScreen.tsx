@@ -31,8 +31,11 @@ import {
   compareSet,
   dayChange,
   e1rm,
-  formatWeight,
+  setLabel,
+  CARDIO_METRICS,
   tally,
+  type CardioMetric,
+  type ExerciseKind,
   topSet,
   type Change,
   type LoggedSet,
@@ -70,7 +73,8 @@ export const MetricsScreen = React.memo(function MetricsScreen() {
   return (
     <Screen
       title="Metrics"
-      glow="#8E8E93"
+      glow={C.glowMetrics}
+      glowSoft
       right={
         <Glass style={styles.modeSwitch}>
           <View pointerEvents="none" style={[styles.modeThumb, mode === 'graph' && { left: 45 }]} />
@@ -353,9 +357,9 @@ function OverloadDay({ workouts, future }: { workouts: Workout[]; future: boolea
                     .slice()
                     .sort((a, b) => a.setIndex - b.setIndex)
                     .map((s, i) => (
-                      <Text key={i} style={{ color: changeColor(compareSet(s, s.prev)), fontWeight: '700' }}>
+                      <Text key={i} style={{ color: changeColor(compareSet(s, s.prev, s.kind)), fontWeight: '700' }}>
                         {i > 0 ? '   ' : ''}
-                        {formatWeight(s.weight)}×{s.reps}
+                        {s.kind === 'cardio' ? setLabel(s, 'cardio', s.metric).replace(' – ', '·') : `${setLabel(s).replace('kg – ', '×')}`}
                       </Text>
                     ))}
                 </Text>
@@ -443,12 +447,19 @@ function GraphView({ metric, color, today }: { metric: Metric; color: string; to
 
   // Every exercise that has been logged (current name if it still exists, else the name it was logged under).
   const exercises = useMemo(() => {
-    const m = new Map<string, string>();
-    for (const w of d.workouts) for (const s of w.sets) m.set(s.exerciseId, s.exerciseName || 'Exercise');
-    for (const sess of d.sessions) for (const e of sess.exercises) if (m.has(e.id)) m.set(e.id, e.name || 'Exercise');
-    return [...m.entries()].map(([id, name]) => ({ id, name }));
+    const m = new Map<string, { name: string; kind: ExerciseKind; unit: CardioMetric }>();
+    for (const w of d.workouts) {
+      for (const s of w.sets) m.set(s.exerciseId, { name: s.exerciseName || 'Exercise', kind: s.kind ?? 'strength', unit: s.metric ?? 'W' });
+    }
+    for (const sess of d.sessions) {
+      for (const e of sess.exercises) {
+        if (m.has(e.id)) m.set(e.id, { name: e.name || 'Exercise', kind: e.kind ?? 'strength', unit: e.metric ?? 'W' });
+      }
+    }
+    return [...m.entries()].map(([id, v]) => ({ id, ...v }));
   }, [d.workouts, d.sessions]);
   const ex = exercises.find((e) => e.id === exId) ?? exercises[0];
+  const cardio = ex?.kind === 'cardio'; // minutes and (say) watts instead of kg and reps
 
   // The best set of that exercise on each day it was done.
   const tops = useMemo(() => {
@@ -457,11 +468,14 @@ function GraphView({ metric, color, today }: { metric: Metric; color: string; to
     const days = [...d.workoutsByDay.keys()].sort();
     for (const date of days) {
       const sets = (d.workoutsByDay.get(date) ?? []).flatMap((w) => w.sets).filter((s) => s.exerciseId === ex.id);
-      const best = measure === 'weight' ? topSet(sets) : sets.slice().sort((a, b) => e1rm(b) - e1rm(a))[0];
+      const best =
+        measure === 'weight'
+          ? topSet(sets)
+          : sets.slice().sort((a, b) => (cardio ? b.reps - a.reps : e1rm(b) - e1rm(a)))[0];
       if (best) out.push({ date, weight: best.weight, reps: best.reps });
     }
     return out;
-  }, [ex, d.workoutsByDay, measure]);
+  }, [ex, cardio, d.workoutsByDay, measure]);
 
   let points: Point[] = [];
   let bars: Bar[] | undefined;
@@ -472,7 +486,10 @@ function GraphView({ metric, color, today }: { metric: Metric; color: string; to
   let faintDots = false;
 
   if (metric === 'overload') {
-    points = tops.map((t) => ({ date: t.date, value: measure === 'weight' ? t.weight : Math.round(e1rm(t) * 10) / 10 }));
+    points = tops.map((t) => ({
+      date: t.date,
+      value: measure === 'weight' ? t.weight : cardio ? t.reps : Math.round(e1rm(t) * 10) / 10,
+    }));
     line = points;
     dots = points;
   } else if (metric === 'nutrition') {
@@ -508,8 +525,8 @@ function GraphView({ metric, color, today }: { metric: Metric; color: string; to
       const b = tops.find((t) => t.date === shown[shown.length - 1].date)!;
       summary =
         shown.length === 1
-          ? `Best set: ${formatWeight(b.weight)} kg × ${b.reps}`
-          : `Best set: ${formatWeight(a.weight)} kg × ${a.reps}  →  ${formatWeight(b.weight)} kg × ${b.reps}`;
+          ? `Best: ${setLabel(b, ex?.kind, ex?.unit)}`
+          : `Best: ${setLabel(a, ex?.kind, ex?.unit)}  →  ${setLabel(b, ex?.kind, ex?.unit)}`;
     } else if (metric === 'nutrition') {
       const hit = shown.filter((p) => dayStatus(p.value, d.goals.kcal) === 'hit').length;
       summary = `Average ${thousands(average(shown.map((p) => p.value)) ?? 0)} kcal · goal reached on ${hit} of ${shown.length} logged days`;
@@ -539,13 +556,13 @@ function GraphView({ metric, color, today }: { metric: Metric; color: string; to
               <Text style={[T.body, { fontWeight: '700', flex: 1 }]} numberOfLines={1}>
                 {ex?.name}
               </Text>
-              <Text style={[T.small, { color: C.overload, fontWeight: '700' }]}>Change exercise</Text>
+              <Text style={[T.small, { color: C.text, fontWeight: '600' }]}>Change exercise</Text>
             </Pressable>
             <View style={{ marginTop: 8 }}>
               <Segmented
                 options={[
-                  { key: 'weight', label: 'Top weight' },
-                  { key: 'strength', label: 'Strength' },
+                  { key: 'weight', label: cardio ? 'Time' : 'Top weight' },
+                  { key: 'strength', label: cardio ? (CARDIO_METRICS.find((m) => m.key === ex?.unit)?.label ?? 'Watts') : 'Strength' },
                 ]}
                 value={measure}
                 onChange={setMeasure}
@@ -563,7 +580,11 @@ function GraphView({ metric, color, today }: { metric: Metric; color: string; to
       {summary ? <Text style={[T.body, { marginTop: 14, fontWeight: '600', lineHeight: 22 }]}>{summary}</Text> : null}
       <Text style={[T.small, { marginTop: 6, lineHeight: 18 }]}>
         {metric === 'overload'
-          ? measure === 'weight'
+          ? cardio
+            ? measure === 'weight'
+              ? 'The longest round of this cardio each time you did it, in minutes.'
+              : 'The highest number (watts, distance, calories or level) of this cardio each time you did it.'
+            : measure === 'weight'
             ? 'The heaviest set of this exercise each time you did it, in kg.'
             : 'Strength = weight and reps as one number (your estimated one-rep max, in kg), so more reps at the same weight shows as progress too.'
           : metric === 'nutrition'

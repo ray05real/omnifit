@@ -1,6 +1,7 @@
 // Overload: the split (sessions), and inside a session its exercises with their sets, laid out like the owner's
-// notes (each exercise its own paragraph, each set a line "50kg – 10"). Tap a set for the wheel; exercises only
-// change after tapping Edit.
+// notes (each exercise its own paragraph, each set a line "50kg – 10"; cardio as "20min – 150W"). Tap a number
+// for its wheel; press and hold a session or an exercise, then drag, to reorder; exercises only change after
+// tapping Edit.
 
 import React, { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
@@ -18,26 +19,33 @@ import {
   PrimaryButton,
   Screen,
   SectionTitle,
+  Segmented,
   Sheet,
   buzz,
   confirmAction,
 } from '../components/ui';
 import { agoLabel, formatDay } from '../lib/dates';
 import {
+  CARDIO_METRICS,
   compareSet,
   dayChange,
   describeChange,
+  formatMinutes,
   formatWeight,
   isBlank,
+  setLabel,
   splitWeight,
+  type CardioMetric,
+  type ExerciseKind,
   type SetVal,
   type Workout,
 } from '../lib/overload';
 import { useToday } from '../store/hooks';
-import { useTraining, type Session } from '../store/training';
+import { useTraining, type Exercise, type Session } from '../store/training';
 import { C, T, alpha, changeColor } from '../theme';
 
 const CHANGE_WORD = { up: 'went up', same: 'stayed the same', down: 'went down', first: 'first time logged' };
+const METRIC_WORD: Record<CardioMetric, string> = { W: 'watts', km: 'distance', kcal: 'calories', level: 'level' };
 
 export const OverloadScreen = React.memo(function OverloadScreen() {
   const [open, setOpen] = useState<{ id: string; edit: boolean } | null>(null);
@@ -57,9 +65,9 @@ function SplitList({ onOpen }: { onOpen: (id: string, edit: boolean) => void }) 
   const sessions = useTraining((s) => s.sessions);
   const workouts = useTraining((s) => s.workouts);
   const addSession = useTraining((s) => s.addSession);
+  const moveSession = useTraining((s) => s.moveSession);
   const [adding, setAdding] = useState(false);
   const [name, setName] = useState('');
-  const moveSession = useTraining((s) => s.moveSession);
 
   // The most recent workout of each session.
   const last = useMemo(() => {
@@ -81,7 +89,7 @@ function SplitList({ onOpen }: { onOpen: (id: string, edit: boolean) => void }) 
   };
 
   return (
-    <Screen title="Overload" subtitle={formatDay(today)} glow={C.overload}>
+    <Screen title="Overload" subtitle={formatDay(today)} glow={C.glowOverload}>
       {sessions.length === 0 ? (
         <Empty
           icon="barbell-outline"
@@ -95,39 +103,41 @@ function SplitList({ onOpen }: { onOpen: (id: string, edit: boolean) => void }) 
           <Group>
             <DragList
               items={sessions}
-              rowHeight={88}
               keyOf={(s) => s.id}
               onPress={(s) => onOpen(s.id, false)}
               onReorder={moveSession}
-              renderRow={(s) => {
+              renderRow={(s, { lifted, last: lastRow }) => {
                 const w = last.get(s.id);
                 const total = s.exercises.reduce((n, e) => n + e.sets.length, 0);
                 const doneToday = w && w.date === today ? w.sets.length : 0;
                 const change = w ? dayChange(w.sets) : null;
                 return (
-                  <>
-                    <Text style={styles.sessionName} numberOfLines={1}>
-                      {s.name}
-                    </Text>
-                    <Text style={[T.small, { marginTop: 2 }]} numberOfLines={1}>
-                      {s.exercises.length} {s.exercises.length === 1 ? 'exercise' : 'exercises'} · {total}{' '}
-                      {total === 1 ? 'set' : 'sets'}
-                    </Text>
-                    <View style={styles.sessionStatus}>
-                      {w ? <View style={[styles.dot, { backgroundColor: changeColor(change) }]} /> : null}
-                      {doneToday > 0 ? (
-                        <Text style={[T.small, { color: C.text, fontWeight: '600' }]} numberOfLines={1}>
-                          Today · {doneToday} of {total} sets done
-                        </Text>
-                      ) : w ? (
-                        <Text style={T.small} numberOfLines={1}>
-                          Last time {agoLabel(w.date, today)} · {change ? CHANGE_WORD[change] : ''}
-                        </Text>
-                      ) : (
-                        <Text style={T.small}>Not logged yet</Text>
-                      )}
+                  <View style={[styles.sessionRow, !lastRow && !lifted && styles.line]}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.sessionName} numberOfLines={1}>
+                        {s.name}
+                      </Text>
+                      <Text style={[T.small, { marginTop: 2 }]} numberOfLines={1}>
+                        {s.exercises.length} {s.exercises.length === 1 ? 'exercise' : 'exercises'} · {total}{' '}
+                        {total === 1 ? 'set' : 'sets'}
+                      </Text>
+                      <View style={styles.sessionStatus}>
+                        {w ? <View style={[styles.dot, { backgroundColor: changeColor(change) }]} /> : null}
+                        {doneToday > 0 ? (
+                          <Text style={[T.small, { color: C.text, fontWeight: '600' }]} numberOfLines={1}>
+                            Today · {doneToday} of {total} sets done
+                          </Text>
+                        ) : w ? (
+                          <Text style={T.small} numberOfLines={1}>
+                            Last time {agoLabel(w.date, today)} · {change ? CHANGE_WORD[change] : ''}
+                          </Text>
+                        ) : (
+                          <Text style={T.small}>Not logged yet</Text>
+                        )}
+                      </View>
                     </View>
-                  </>
+                    <Ionicons name={lifted ? 'reorder-three' : 'chevron-forward'} size={lifted ? 22 : 17} color={C.faint} />
+                  </View>
                 );
               }}
             />
@@ -138,13 +148,7 @@ function SplitList({ onOpen }: { onOpen: (id: string, edit: boolean) => void }) 
         </>
       )}
 
-      <GhostButton
-        label="Add session"
-        icon="add"
-        color={C.overload}
-        onPress={() => setAdding(true)}
-        style={{ marginTop: 16 }}
-      />
+      <GhostButton label="Add session" icon="add" color={C.text} onPress={() => setAdding(true)} style={{ marginTop: 16 }} />
 
       <Sheet visible={adding} onClose={() => setAdding(false)} title="New session">
         <Field
@@ -157,13 +161,7 @@ function SplitList({ onOpen }: { onOpen: (id: string, edit: boolean) => void }) 
           onSubmitEditing={create}
           maxLength={40}
         />
-        <PrimaryButton
-          label="Add and write its exercises"
-          color={C.overload}
-          onPress={create}
-          disabled={!name.trim()}
-          style={{ marginTop: 18 }}
-        />
+        <PrimaryButton label="Add and write its exercises" onPress={create} disabled={!name.trim()} style={{ marginTop: 18 }} />
       </Sheet>
     </Screen>
   );
@@ -171,10 +169,12 @@ function SplitList({ onOpen }: { onOpen: (id: string, edit: boolean) => void }) 
 
 // ───────────────────────── One session: each exercise a paragraph ─────────────────────────
 
+type WheelTarget = { exId: string; index: number; part: 'weight' | 'reps' };
+
 function SessionView({ session, startInEdit, onBack }: { session: Session; startInEdit: boolean; onBack: () => void }) {
   const today = useToday();
   const [edit, setEdit] = useState(startInEdit);
-  const [wheel, setWheel] = useState<{ exId: string; index: number; part: 'weight' | 'reps' } | null>(null);
+  const [wheel, setWheel] = useState<WheelTarget | null>(null);
   const [fresh, setFresh] = useState<string | null>(null); // the exercise just added: its name box gets the keyboard
 
   const workouts = useTraining((s) => s.workouts);
@@ -199,9 +199,102 @@ function SessionView({ session, startInEdit, onBack }: { session: Session; start
     setFresh(null);
   };
 
+  const renderExercise = (ex: Exercise, { lifted, last }: { lifted: boolean; last: boolean }) => {
+    const kind: ExerciseKind = ex.kind ?? 'strength';
+    const metric: CardioMetric = ex.metric ?? 'W';
+    return (
+      <View style={[styles.exercise, !last && !lifted && styles.line]}>
+        {edit ? (
+          <>
+            <View style={styles.exHead}>
+              <TextInput
+                value={ex.name}
+                onChangeText={(v) => t.renameExercise(session.id, ex.id, v)}
+                placeholder={kind === 'cardio' ? 'Cardio (e.g. Bike, Rower)' : 'Exercise name'}
+                placeholderTextColor={C.faint}
+                keyboardAppearance="dark"
+                autoFocus={fresh === ex.id}
+                style={styles.exInput}
+                maxLength={60}
+              />
+              {/* Hold here (or anywhere on the exercise that isn't a button) and drag to move it. */}
+              <View style={styles.handle}>
+                <Ionicons name="reorder-three" size={24} color={C.faint} />
+              </View>
+              <IconButton
+                icon="trash-outline"
+                size={19}
+                color={C.down}
+                label="Delete exercise"
+                onPress={() =>
+                  confirmAction(
+                    `Delete ${ex.name || 'this exercise'}?`,
+                    'It leaves this session. What you already logged stays in Metrics.',
+                    'Delete',
+                    () => t.deleteExercise(session.id, ex.id),
+                  )
+                }
+              />
+            </View>
+            {kind === 'cardio' ? (
+              <View style={{ marginBottom: 6, marginTop: 2 }}>
+                <Segmented options={CARDIO_METRICS} value={metric} onChange={(m) => t.setMetric(session.id, ex.id, m)} />
+              </View>
+            ) : null}
+          </>
+        ) : (
+          <Text style={styles.exName}>{ex.name || (kind === 'cardio' ? 'Cardio' : 'Untitled exercise')}</Text>
+        )}
+
+        {ex.sets.map((s, i) => (
+          <SetRow
+            key={i}
+            index={i}
+            set={s}
+            kind={kind}
+            metric={metric}
+            logged={loggedSet(ex.id, i)}
+            edit={edit}
+            onWeight={() => setWheel({ exId: ex.id, index: i, part: 'weight' })}
+            onReps={() => setWheel({ exId: ex.id, index: i, part: 'reps' })}
+            onTick={() => {
+              const lg = loggedSet(ex.id, i);
+              if (lg) {
+                buzz();
+                t.unlogSet(session.id, ex.id, i, today);
+              } else if (isBlank(s)) {
+                setWheel({ exId: ex.id, index: i, part: 'weight' });
+              } else {
+                buzz('done');
+                t.logSet(session.id, ex.id, i, s, today);
+              }
+            }}
+            onRemove={() => t.removeSet(session.id, ex.id, i, today)}
+          />
+        ))}
+
+        {edit ? (
+          <GhostButton
+            label={kind === 'cardio' ? 'Add round' : 'Add set'}
+            icon="add-circle"
+            color={C.text}
+            outlined={false}
+            onPress={() => t.addSet(session.id, ex.id)}
+            style={{ alignSelf: 'flex-start', height: 40, paddingHorizontal: 0 }}
+          />
+        ) : null}
+      </View>
+    );
+  };
+
+  const wheelKind: ExerciseKind = wheelEx?.kind ?? 'strength';
+  const wheelMetric: CardioMetric = wheelEx?.metric ?? 'W';
+  const partWord =
+    wheel?.part === 'weight' ? (wheelKind === 'cardio' ? 'time' : 'weight') : wheelKind === 'cardio' ? METRIC_WORD[wheelMetric] : 'reps';
+
   return (
     <Screen
-      glow={C.overload}
+      glow={C.glowOverload}
       left={<IconButton icon="chevron-back" onPress={onBack} label="Back to your split" filled />}
       title={
         edit ? (
@@ -223,8 +316,8 @@ function SessionView({ session, startInEdit, onBack }: { session: Session; start
       subtitle={edit ? undefined : done > 0 ? `Today · ${done} of ${total} sets done` : formatDay(today)}
       right={
         edit ? (
-          <Pressable onPress={toggleEdit} accessibilityRole="button" style={[styles.donePill, { backgroundColor: C.overload }]}>
-            <Text style={[styles.editText, { color: '#fff' }]}>Done</Text>
+          <Pressable onPress={toggleEdit} accessibilityRole="button" style={styles.donePill}>
+            <Text style={[styles.editText, { color: C.ink }]}>Done</Text>
           </Pressable>
         ) : (
           <Pressable onPress={toggleEdit} accessibilityRole="button">
@@ -239,102 +332,32 @@ function SessionView({ session, startInEdit, onBack }: { session: Session; start
         <Empty icon="create-outline" title="No exercises yet" text="Tap Edit to write in this session's exercises." />
       ) : null}
 
-      {session.exercises.map((ex, exIndex) => (
-        <View key={ex.id} style={[styles.exercise, exIndex < session.exercises.length - 1 && styles.exerciseLine]}>
-          {edit ? (
-            <View style={styles.exHead}>
-              <TextInput
-                value={ex.name}
-                onChangeText={(v) => t.renameExercise(session.id, ex.id, v)}
-                placeholder="Exercise name"
-                placeholderTextColor={C.faint}
-                keyboardAppearance="dark"
-                autoFocus={fresh === ex.id}
-                style={styles.exInput}
-                maxLength={60}
-              />
-              <IconButton
-                icon="arrow-up"
-                size={19}
-                color={C.muted}
-                label="Move up"
-                disabled={exIndex === 0}
-                onPress={() => t.moveExercise(session.id, ex.id, -1)}
-              />
-              <IconButton
-                icon="arrow-down"
-                size={19}
-                color={C.muted}
-                label="Move down"
-                disabled={exIndex === session.exercises.length - 1}
-                onPress={() => t.moveExercise(session.id, ex.id, 1)}
-              />
-              <IconButton
-                icon="trash-outline"
-                size={19}
-                color={C.down}
-                label="Delete exercise"
-                onPress={() =>
-                  confirmAction(
-                    `Delete ${ex.name || 'this exercise'}?`,
-                    'It leaves this session. What you already logged stays in Metrics.',
-                    'Delete',
-                    () => t.deleteExercise(session.id, ex.id),
-                  )
-                }
-              />
-            </View>
-          ) : (
-            <Text style={styles.exName}>{ex.name || 'Untitled exercise'}</Text>
-          )}
-
-          {ex.sets.map((s, i) => (
-            <SetRow
-              key={i}
-              index={i}
-              set={s}
-              logged={loggedSet(ex.id, i)}
-              edit={edit}
-              onWeight={() => setWheel({ exId: ex.id, index: i, part: 'weight' })}
-              onReps={() => setWheel({ exId: ex.id, index: i, part: 'reps' })}
-              onTick={() => {
-                const lg = loggedSet(ex.id, i);
-                if (lg) {
-                  buzz();
-                  t.unlogSet(session.id, ex.id, i, today);
-                } else if (isBlank(s)) {
-                  setWheel({ exId: ex.id, index: i, part: 'weight' });
-                } else {
-                  buzz('done');
-                  t.logSet(session.id, ex.id, i, s, today);
-                }
-              }}
-              onRemove={() => t.removeSet(session.id, ex.id, i, today)}
-            />
-          ))}
-
-          {edit ? (
-            <GhostButton
-              label="Add set"
-              icon="add-circle"
-              color={C.overload}
-              outlined={false}
-              onPress={() => t.addSet(session.id, ex.id)}
-              style={{ alignSelf: 'flex-start', height: 40, paddingHorizontal: 0 }}
-            />
-          ) : null}
-        </View>
-      ))}
+      <DragList
+        items={session.exercises}
+        keyOf={(ex) => ex.id}
+        highlight={false}
+        onReorder={(from, to) => t.moveExercise(session.id, from, to)}
+        renderRow={renderExercise}
+      />
 
       {edit ? (
         <>
-          <GhostButton
-            label="Add exercise"
-            icon="add"
-            color={C.overload}
-            onPress={() => setFresh(t.addExercise(session.id))}
-            style={{ marginTop: 6 }}
-          />
+          <View style={styles.addRow}>
+            <GhostButton
+              label="Exercise"
+              icon="add"
+              color={C.text}
+              onPress={() => setFresh(t.addExercise(session.id))}
+              style={{ flex: 1 }}
+            />
+            <GhostButton
+              label="Cardio"
+              icon="add"
+              color={C.text}
+              onPress={() => setFresh(t.addExercise(session.id, 'cardio'))}
+              style={{ flex: 1 }}
+            />
+          </View>
           <GhostButton
             label="Delete this session"
             icon="trash-outline"
@@ -355,8 +378,9 @@ function SessionView({ session, startInEdit, onBack }: { session: Session; start
           />
         </>
       ) : session.exercises.length > 0 ? (
-        <Text style={[T.small, { textAlign: 'center', marginTop: 8, lineHeight: 18, color: C.faint }]}>
-          Tap the weight or the reps to change it with the wheel.{'\n'}Tap the circle when it's done as written.
+        <Text style={[T.small, { textAlign: 'center', marginTop: 10, lineHeight: 18, color: C.faint }]}>
+          Tap a number to change it with the wheel.{'\n'}Tap the circle when it's done as written.{'\n'}Press and hold an
+          exercise, then drag it to reorder.
         </Text>
       ) : null}
 
@@ -364,16 +388,18 @@ function SessionView({ session, startInEdit, onBack }: { session: Session; start
         <SetWheelSheet
           key={wheel.exId + ':' + wheel.index + wheel.part}
           part={wheel.part}
-          title={(wheelEx.name || 'Exercise') + (wheel.part === 'weight' ? ' · weight' : ' · reps')}
+          kind={wheelKind}
+          metric={wheelMetric}
+          title={(wheelEx.name || (wheelKind === 'cardio' ? 'Cardio' : 'Exercise')) + ' · ' + partWord}
           subtitle={
             edit
               ? `Set ${wheel.index + 1} · starting numbers`
               : wheelLogged
                 ? `Set ${wheel.index + 1} · logged today` +
-                  (wheelLogged.prev ? ` · last time ${formatWeight(wheelLogged.prev.weight)}kg – ${wheelLogged.prev.reps}` : '')
+                  (wheelLogged.prev ? ` · last time ${setLabel(wheelLogged.prev, wheelKind, wheelMetric)}` : '')
                 : isBlank(wheelSet)
                   ? `Set ${wheel.index + 1}`
-                  : `Set ${wheel.index + 1} · last time ${formatWeight(wheelSet.weight)}kg – ${wheelSet.reps}`
+                  : `Set ${wheel.index + 1} · last time ${setLabel(wheelSet, wheelKind, wheelMetric)}`
           }
           initial={wheelSet}
           action={edit ? 'Save' : wheelLogged ? 'Update set' : 'Log set'}
@@ -392,10 +418,12 @@ function SessionView({ session, startInEdit, onBack }: { session: Session; start
   );
 }
 
-// One line of the note: "50kg – 10", what changed, and a round tick like Reminders'.
+// One line of the note: "50kg – 10" (or "20min – 150W"), what changed, and a round tick like Reminders'.
 function SetRow({
   index,
   set,
+  kind,
+  metric,
   logged,
   edit,
   onWeight,
@@ -405,6 +433,8 @@ function SetRow({
 }: {
   index: number;
   set: SetVal;
+  kind: ExerciseKind;
+  metric: CardioMetric;
   logged: Workout['sets'][number] | undefined;
   edit: boolean;
   onWeight: () => void;
@@ -412,10 +442,12 @@ function SetRow({
   onTick: () => void;
   onRemove: () => void;
 }) {
-  const change = logged ? compareSet(logged, logged.prev) : null;
+  const change = logged ? compareSet(logged, logged.prev, kind) : null;
   const color = changeColor(change);
-  const delta = logged ? describeChange(logged, logged.prev) : '';
+  const delta = logged ? describeChange(logged, logged.prev, kind, metric) : '';
   const tag = delta || (change === 'same' ? 'Same' : '');
+  const cardio = kind === 'cardio';
+  const blank = isBlank(set) && { color: C.faint };
   return (
     <View style={styles.setRow}>
       {edit ? (
@@ -423,18 +455,22 @@ function SetRow({
           <Ionicons name="remove-circle" size={23} color={C.down} />
         </Pressable>
       ) : null}
-      {/* The weight and the reps are two separate things to tap: each opens its own wheel. */}
+      {/* The two numbers are separate things to tap: each opens its own wheel. */}
       <View style={styles.numbers}>
         <Pressable
           onPress={onWeight}
           hitSlop={{ top: 6, bottom: 6, left: 8 }}
           accessibilityRole="button"
-          accessibilityLabel={`Set ${index + 1} weight: ${formatWeight(set.weight)} kilos. Tap to change.`}
+          accessibilityLabel={
+            cardio
+              ? `Set ${index + 1} time: ${formatMinutes(set.weight)} minutes. Tap to change.`
+              : `Set ${index + 1} weight: ${formatWeight(set.weight)} kilos. Tap to change.`
+          }
           style={({ pressed }) => [styles.part, pressed && styles.partPressed]}
         >
-          <Text style={[styles.setText, isBlank(set) && { color: C.faint }]}>
-            {formatWeight(set.weight)}
-            <Text style={styles.unit}>kg</Text>
+          <Text style={[styles.setText, blank]}>
+            {cardio ? formatMinutes(set.weight) : formatWeight(set.weight)}
+            <Text style={styles.unit}>{cardio ? 'min' : 'kg'}</Text>
           </Text>
         </Pressable>
         <Text style={[styles.setText, styles.dash]}>–</Text>
@@ -442,10 +478,14 @@ function SetRow({
           onPress={onReps}
           hitSlop={{ top: 6, bottom: 6, right: 8 }}
           accessibilityRole="button"
-          accessibilityLabel={`Set ${index + 1} reps: ${set.reps}. Tap to change.`}
+          accessibilityLabel={`Set ${index + 1} ${cardio ? METRIC_WORD[metric] : 'reps'}: ${set.reps}. Tap to change.`}
           style={({ pressed }) => [styles.part, pressed && styles.partPressed]}
         >
-          <Text style={[styles.setText, isBlank(set) && { color: C.faint }]}>{set.reps}</Text>
+          <Text style={[styles.setText, blank]}>
+            {cardio && metric === 'level' ? <Text style={styles.unit}>lvl </Text> : null}
+            {formatWeight(set.reps)}
+            {cardio && metric !== 'level' ? <Text style={styles.unit}>{metric}</Text> : null}
+          </Text>
         </Pressable>
         {!edit && tag ? (
           <View style={[styles.tag, { backgroundColor: alpha(color, 0.18) }]}>
@@ -471,16 +511,31 @@ function SetRow({
   );
 }
 
-// ───────────────────────── The wheel: kg, quarter kg, reps ─────────────────────────
+// ───────────────────────── The wheels ─────────────────────────
 
 const KG = range(0, 400);
 const QUARTERS = [0, 0.25, 0.5, 0.75];
 const REPS = range(0, 60);
+const MINUTES = range(0, 300);
+const WATTS = range(0, 1000, 5);
+const KM = range(0, 200);
+const TENTHS = range(0, 9);
+const KCAL = range(0, 3000, 10);
+const LEVELS = range(0, 30);
+
+// The nearest value the wheel has (a number typed in another unit may fall between two of them).
+function snap(value: number, values: number[]): number {
+  let best = values[0];
+  for (const v of values) if (Math.abs(v - value) < Math.abs(best - value)) best = v;
+  return best;
+}
 
 function SetWheelSheet({
   title,
   subtitle,
   part,
+  kind,
+  metric,
   initial,
   action,
   onSave,
@@ -489,39 +544,61 @@ function SetWheelSheet({
   title: string;
   subtitle: string;
   part: 'weight' | 'reps'; // which of the two was tapped: only that one's wheel shows
+  kind: ExerciseKind;
+  metric: CardioMetric;
   initial: SetVal;
   action: string;
   onSave: (v: SetVal) => void;
   onClose: () => void;
 }) {
+  const cardio = kind === 'cardio';
+  // The first number: kg and quarter kg, or minutes and quarter minutes.
   const start = splitWeight(initial.weight);
-  const [whole, setWhole] = useState(Math.min(start.whole, 400));
+  const [whole, setWhole] = useState(Math.min(start.whole, cardio ? 300 : 400));
   const [quarter, setQuarter] = useState(start.quarter);
-  const [reps, setReps] = useState(Math.min(initial.reps, 60));
+  // The second: reps, or the cardio machine's number (km has a tenths wheel).
+  const secondValues = !cardio ? REPS : metric === 'W' ? WATTS : metric === 'kcal' ? KCAL : metric === 'level' ? LEVELS : KM;
+  const [second, setSecond] = useState(snap(metric === 'km' && cardio ? Math.floor(initial.reps) : initial.reps, secondValues));
+  const [tenth, setTenth] = useState(cardio && metric === 'km' ? Math.round((initial.reps % 1) * 10) % 10 : 0);
+
+  const value = (): SetVal => ({
+    weight: whole + quarter,
+    reps: cardio && metric === 'km' ? Math.round((second + tenth / 10) * 10) / 10 : second,
+  });
+
   return (
     <Sheet visible onClose={onClose} title={title} subtitle={subtitle}>
       {part === 'weight' ? (
         <WheelRow>
-          <WheelColumn label="kg" values={KG} value={whole} onChange={setWhole} flex={1.4} />
+          <WheelColumn label={cardio ? 'min' : 'kg'} values={cardio ? MINUTES : KG} value={whole} onChange={setWhole} flex={1.4} />
           <WheelColumn
-            label="+"
+            label={cardio ? 'sec' : '+'}
             values={QUARTERS}
             value={quarter}
             onChange={setQuarter}
-            format={(v) => (v === 0 ? '.0' : '.' + String(v).slice(2))}
+            format={(v) => (cardio ? ':' + (v === 0 ? '00' : String(v * 60)) : v === 0 ? '.0' : '.' + String(v).slice(2))}
           />
         </WheelRow>
       ) : (
         <WheelRow>
-          <WheelColumn label="reps" values={REPS} value={reps} onChange={setReps} />
+          <WheelColumn
+            label={!cardio ? 'reps' : metric === 'level' ? 'level' : metric}
+            values={secondValues}
+            value={second}
+            onChange={setSecond}
+            flex={1.4}
+          />
+          {cardio && metric === 'km' ? <WheelColumn label="+" values={TENTHS} value={tenth} onChange={setTenth} format={(v) => '.' + v} /> : null}
         </WheelRow>
       )}
-      <PrimaryButton label={action} color={C.overload} onPress={() => onSave({ weight: whole + quarter, reps })} />
+      <PrimaryButton label={action} onPress={() => onSave(value())} />
     </Sheet>
   );
 }
 
 const styles = StyleSheet.create({
+  line: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: C.line },
+  sessionRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginLeft: 16, paddingRight: 16, paddingVertical: 13 },
   sessionName: { color: C.text, fontSize: 19, fontWeight: '600', letterSpacing: -0.4 },
   sessionStatus: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 6 },
   dot: { width: 8, height: 8, borderRadius: 4 },
@@ -538,13 +615,19 @@ const styles = StyleSheet.create({
     height: 44,
   },
   editPill: { height: 40, paddingHorizontal: 18, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
-  donePill: { height: 40, paddingHorizontal: 18, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
+  donePill: {
+    height: 40,
+    paddingHorizontal: 18,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: C.text,
+  },
   editText: { color: C.text, fontSize: 16, fontWeight: '600' },
 
   // No card behind an exercise (the owner found it looked generated): plain paragraphs like the Notes page,
   // with one very thin line between exercises.
-  exercise: { paddingTop: 12, paddingBottom: 10, paddingHorizontal: 4 },
-  exerciseLine: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: C.line },
+  exercise: { paddingTop: 12, paddingBottom: 10, paddingHorizontal: 8 },
   exName: { color: C.text, fontSize: 17, fontWeight: '600', letterSpacing: -0.4, marginBottom: 2 },
   exHead: { flexDirection: 'row', alignItems: 'center', marginBottom: 4 },
   exInput: {
@@ -560,6 +643,8 @@ const styles = StyleSheet.create({
     height: 42,
     marginRight: 2,
   },
+  handle: { width: 40, height: 42, alignItems: 'center', justifyContent: 'center' },
+  addRow: { flexDirection: 'row', gap: 10, marginTop: 10 },
 
   setRow: { flexDirection: 'row', alignItems: 'center', minHeight: 31 },
   numbers: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6 },

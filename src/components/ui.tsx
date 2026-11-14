@@ -60,14 +60,14 @@ export function tabBarSpace(insets: EdgeInsets): number {
 }
 
 // A soft glow of the section's colour at the top of the page, so the glass has something to show.
-function Glow({ color }: { color: string }) {
+function Glow({ color, soft }: { color: string; soft?: boolean }) {
   const id = 'glow' + color.replace(/[^a-zA-Z0-9]/g, '');
   return (
     <Svg style={styles.glow} width="100%" height={520} pointerEvents="none">
       <Defs>
         <RadialGradient id={id} cx="50%" cy="0%" rx="85%" ry="100%" fx="50%" fy="0%">
-          <Stop offset="0" stopColor={color} stopOpacity={0.13} />
-          <Stop offset="0.6" stopColor={color} stopOpacity={0.04} />
+          <Stop offset="0" stopColor={color} stopOpacity={soft ? 0.13 : 0.3} />
+          <Stop offset="0.6" stopColor={color} stopOpacity={soft ? 0.04 : 0.1} />
           <Stop offset="1" stopColor={color} stopOpacity={0} />
         </RadialGradient>
       </Defs>
@@ -83,7 +83,9 @@ export function Screen({
   left,
   right,
   footer,
+  fab,
   glow,
+  glowSoft,
   children,
 }: {
   title: React.ReactNode;
@@ -91,7 +93,9 @@ export function Screen({
   left?: React.ReactNode;
   right?: React.ReactNode;
   footer?: React.ReactNode;
+  fab?: { icon: IconName; label: string; onPress: () => void }; // a round button in the bottom-right corner
   glow?: string;
+  glowSoft?: boolean;
   children: React.ReactNode;
 }) {
   const insets = useSafeAreaInsets();
@@ -99,7 +103,7 @@ export function Screen({
   const locked = usePageLock((s) => s.locked);
   return (
     <View style={{ flex: 1 }}>
-      {glow ? <Glow color={glow} /> : null}
+      {glow ? <Glow color={glow} soft={glowSoft} /> : null}
       <View style={{ flex: 1, paddingTop: insets.top + 4 }}>
         <View style={styles.header}>
           {left}
@@ -117,7 +121,7 @@ export function Screen({
         </View>
         <ScrollView
           style={{ flex: 1 }}
-          contentContainerStyle={{ paddingHorizontal: PAD, paddingTop: 6, paddingBottom: space + (footer ? 76 : 20) }}
+          contentContainerStyle={{ paddingHorizontal: PAD, paddingTop: 6, paddingBottom: space + (footer || fab ? 76 : 20) }}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
           automaticallyAdjustKeyboardInsets
@@ -127,6 +131,16 @@ export function Screen({
         </ScrollView>
       </View>
       {footer ? <View style={[styles.footer, { bottom: space }]}>{footer}</View> : null}
+      {fab ? (
+        <Pressable
+          onPress={fab.onPress}
+          accessibilityRole="button"
+          accessibilityLabel={fab.label}
+          style={({ pressed }) => [styles.fab, { bottom: space + 2, opacity: pressed ? 0.75 : 1 }]}
+        >
+          <Ionicons name={fab.icon} size={28} color={C.ink} />
+        </Pressable>
+      ) : null}
     </View>
   );
 }
@@ -445,6 +459,21 @@ const styles = StyleSheet.create({
     minHeight: 54,
   },
   footer: { position: 'absolute', left: PAD, right: PAD },
+  fab: {
+    position: 'absolute',
+    right: PAD + 6,
+    width: 58,
+    height: 58,
+    borderRadius: 29,
+    backgroundColor: C.text,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOpacity: 0.45,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 6,
+  },
   card: {
     backgroundColor: C.card,
     borderRadius: RADIUS,

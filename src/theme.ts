@@ -31,6 +31,14 @@ export const C = {
   carbs: '#FFFFFF',
   fat: '#FFFFFF',
 
+  // The soft glow at the top of each page is the one place the sections have a colour (the owner, 14 Nov 2026).
+  // The purple and the blue are kept well apart.
+  glowOverload: '#BF5AF2', // systemPurple
+  glowNutrition: '#30D158', // systemGreen
+  glowWeight: '#FFD60A', // systemYellow
+  glowSleep: '#0A84FF', // systemBlue
+  glowMetrics: '#8E8E93', // grey, quieter
+
   up: '#30D158', // systemGreen
   same: '#8E8E93', // systemGray
   down: '#FF453A', // systemRed
