@@ -95,7 +95,8 @@ Overload · Nutrition · Weight · Sleep · Metrics.
 
 - **Overload details (the owner, 14 Nov 2026):** press and hold a session in the split, then **drag** it to
   reorder (`src/components/DragList.tsx`; arrows were tried and rejected). In a session the **weight and the
-  reps are two separate things to tap**, each opening its own wheel. Exercise cards are compact, with the
+  reps are two separate things to tap**, each opening its own wheel. **No card behind an exercise** (the owner:
+  it "feels AI generated"): plain paragraphs with one very thin line between exercises, compact, with the
   proportions of the owner's Notes page (17pt text, lines about 30pt apart).
 - **Testing is by sideloaded .ipa now** (the owner, 14 Nov 2026), same as the To Do app: every push to GitHub
   builds an unsigned .ipa on GitHub's Mac (`.github/workflows/build.yml`) and publishes it as a Release; the

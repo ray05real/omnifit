@@ -10,7 +10,6 @@ import { DragList } from '../components/DragList';
 import { Glass } from '../components/Glass';
 import { WheelColumn, WheelRow, range } from '../components/Wheel';
 import {
-  Card,
   Empty,
   Field,
   GhostButton,
@@ -241,7 +240,7 @@ function SessionView({ session, startInEdit, onBack }: { session: Session; start
       ) : null}
 
       {session.exercises.map((ex, exIndex) => (
-        <Card key={ex.id} style={styles.exercise}>
+        <View key={ex.id} style={[styles.exercise, exIndex < session.exercises.length - 1 && styles.exerciseLine]}>
           {edit ? (
             <View style={styles.exHead}>
               <TextInput
@@ -324,7 +323,7 @@ function SessionView({ session, startInEdit, onBack }: { session: Session; start
               style={{ alignSelf: 'flex-start', height: 40, paddingHorizontal: 0 }}
             />
           ) : null}
-        </Card>
+        </View>
       ))}
 
       {edit ? (
@@ -542,8 +541,10 @@ const styles = StyleSheet.create({
   donePill: { height: 40, paddingHorizontal: 18, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
   editText: { color: C.text, fontSize: 16, fontWeight: '600' },
 
-  // Compact, with the proportions of the owner's Notes page: 17pt text, lines about 30pt apart.
-  exercise: { marginBottom: 8, paddingTop: 11, paddingBottom: 8, paddingHorizontal: 16, borderRadius: 20 },
+  // No card behind an exercise (the owner found it looked generated): plain paragraphs like the Notes page,
+  // with one very thin line between exercises.
+  exercise: { paddingTop: 12, paddingBottom: 10, paddingHorizontal: 4 },
+  exerciseLine: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: C.line },
   exName: { color: C.text, fontSize: 17, fontWeight: '600', letterSpacing: -0.4, marginBottom: 2 },
   exHead: { flexDirection: 'row', alignItems: 'center', marginBottom: 4 },
   exInput: {
