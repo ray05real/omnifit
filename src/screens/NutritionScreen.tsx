@@ -1,8 +1,7 @@
 // Nutrition: the day's ring against the calorie goal, the three macros, and the food log by time.
-// The date bar sits above the card; in the card the calorie ring is on the left and the three macro rings are
-// stacked on its right (the owner's layout: full-size rings, less height).
+// The card with the rings carries the date: swipe it sideways (or tap its arrows) to change day.
 
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState, type ComponentRef } from 'react';
 import {
   KeyboardAvoidingView,
   Modal,
@@ -20,7 +19,6 @@ import { Ring } from '../components/Ring';
 import { TimeWheels } from '../components/Wheel';
 import {
   Card,
-  DateStepper,
   Empty,
   Field,
   GhostButton,
@@ -36,6 +34,7 @@ import {
 } from '../components/ui';
 import { addDays, formatDay, relativeDay, type DateKey } from '../lib/dates';
 import {
+  ZERO,
   amountLabel,
   dayStatus,
   macroKcal,
@@ -64,20 +63,16 @@ export const NutritionScreen = React.memo(function NutritionScreen() {
     () => entries.filter((e) => e.date === day).sort((a, b) => a.time.localeCompare(b.time)),
     [entries, day],
   );
-  const total = useMemo(() => sum(dayEntries), [dayEntries]);
+  // The totals of the day shown and of the days either side (the card's neighbours while swiping).
+  const totals = useMemo(() => {
+    const days = [addDays(day, -1), day, addDays(day, 1)];
+    return days.map((d) => sum(entries.filter((e) => e.date === d)));
+  }, [entries, day]);
 
   const [adding, setAdding] = useState(false);
   const [addKey, setAddKey] = useState(0);
   const [editing, setEditing] = useState<FoodEntry | null>(null);
   const [goalsOpen, setGoalsOpen] = useState(false);
-
-  const status = dayStatus(total.kcal, goals.kcal);
-  // Green once the goal is reached, red if well over, white on the way there.
-  const ringColor = status === 'over' ? C.down : status === 'hit' ? C.up : C.text;
-  const left = goals.kcal - total.kcal;
-  const leftText = status === 'over' ? `${thousands(-left)} over` : left <= 0 ? 'Goal reached' : `${thousands(left)} left`;
-  const dayName = relativeDay(day, today);
-  const label = dayName === formatDay(day) ? dayName : `${dayName} · ${formatDay(day)}`;
 
   const move = (n: number) => {
     const next = addDays(day, n);
@@ -98,20 +93,7 @@ export const NutritionScreen = React.memo(function NutritionScreen() {
         },
       }}
     >
-      <DateStepper label={label} onPrev={() => move(-1)} onNext={() => move(1)} onPressLabel={picked ? () => setPicked(null) : undefined} />
-
-      <Card style={styles.dayCard}>
-        <Ring size={210} stroke={22} progress={total.kcal / goals.kcal} color={ringColor}>
-          <Text style={styles.bigNum}>{thousands(total.kcal)}</Text>
-          <Text style={T.muted}>of {thousands(goals.kcal)} kcal</Text>
-          <Text style={[styles.leftText, { color: status === 'none' ? C.muted : ringColor }]}>{leftText}</Text>
-        </Ring>
-        <View style={styles.macros}>
-          <MacroRing label="Protein" value={total.protein} goal={goals.protein} />
-          <MacroRing label="Carbs" value={total.carbs} goal={goals.carbs} />
-          <MacroRing label="Fat" value={total.fat} goal={goals.fat} />
-        </View>
-      </Card>
+      <DayCard day={day} today={today} totals={totals} goals={goals} onMove={move} onToday={picked ? () => setPicked(null) : undefined} />
 
       {!goalsSet ? (
         <Pressable onPress={() => setGoalsOpen(true)} style={styles.banner} accessibilityRole="button">
@@ -122,7 +104,7 @@ export const NutritionScreen = React.memo(function NutritionScreen() {
         </Pressable>
       ) : null}
 
-      <SectionTitle>Food log</SectionTitle>
+      <SectionTitle style={{ marginTop: 18 }}>Food log</SectionTitle>
       {dayEntries.length === 0 ? (
         <Empty icon="restaurant-outline" title="Nothing logged" text="Tap + to add what you ate or drank." />
       ) : (
@@ -153,15 +135,154 @@ export const NutritionScreen = React.memo(function NutritionScreen() {
   );
 });
 
-// One macro: its ring (the size it always was) with the numbers underneath.
+// ───────────────────────── The day's card: date, calorie ring, macros ─────────────────────────
+
+// Three pages side by side (yesterday, the day, tomorrow); after a swipe the new day becomes the middle one.
+function DayCard({
+  day,
+  today,
+  totals,
+  goals,
+  onMove,
+  onToday,
+}: {
+  day: DateKey;
+  today: DateKey;
+  totals: Macros[];
+  goals: Macros;
+  onMove: (n: number) => void;
+  onToday?: () => void;
+}) {
+  const [w, setW] = useState(0);
+  const scroller = useRef<ComponentRef<typeof ScrollView>>(null);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Whenever the day changes (or the card gets its width), show the middle page again.
+  useLayoutEffect(() => {
+    if (w > 0) scroller.current?.scrollTo({ x: w, animated: false });
+  }, [day, w]);
+  useEffect(() => () => void (timer.current && clearTimeout(timer.current)), []);
+
+  const settle = (x: number) => {
+    if (w <= 0) return;
+    const page = Math.round(x / w);
+    if (page !== 1) {
+      buzz();
+      onMove(page - 1);
+    }
+  };
+
+  return (
+    <Card style={styles.dayCard}>
+      <View onLayout={(e) => setW(e.nativeEvent.layout.width)}>
+        {w > 0 ? (
+          <ScrollView
+            ref={scroller}
+            horizontal
+            pagingEnabled
+            nestedScrollEnabled
+            bounces={false}
+            showsHorizontalScrollIndicator={false}
+            contentOffset={{ x: w, y: 0 }}
+            scrollEventThrottle={16}
+            onMomentumScrollEnd={(e) => settle(e.nativeEvent.contentOffset.x)}
+            // The PC preview has no "the swipe has stopped" event: wait for the scrolling to go quiet instead.
+            onScroll={
+              Platform.OS === 'web'
+                ? (e) => {
+                    const x = e.nativeEvent.contentOffset.x;
+                    if (timer.current) clearTimeout(timer.current);
+                    timer.current = setTimeout(() => settle(x), 140);
+                  }
+                : undefined
+            }
+          >
+            {[-1, 0, 1].map((n) => (
+              <DayPage
+                key={n}
+                width={w}
+                day={addDays(day, n)}
+                today={today}
+                total={totals[n + 1] ?? ZERO}
+                goals={goals}
+                onPrev={() => onMove(-1)}
+                onNext={() => onMove(1)}
+                onToday={onToday}
+              />
+            ))}
+          </ScrollView>
+        ) : (
+          <View style={{ height: 300 }} />
+        )}
+      </View>
+    </Card>
+  );
+}
+
+function DayPage({
+  width,
+  day,
+  today,
+  total,
+  goals,
+  onPrev,
+  onNext,
+  onToday,
+}: {
+  width: number;
+  day: DateKey;
+  today: DateKey;
+  total: Macros;
+  goals: Macros;
+  onPrev: () => void;
+  onNext: () => void;
+  onToday?: () => void;
+}) {
+  const status = dayStatus(total.kcal, goals.kcal);
+  // Green once the goal is reached, red if well over, white on the way there.
+  const ringColor = status === 'over' ? C.down : status === 'hit' ? C.up : C.text;
+  const left = goals.kcal - total.kcal;
+  const leftText = status === 'over' ? `${thousands(-left)} over` : left <= 0 ? 'Goal reached' : `${thousands(left)} left`;
+  const dayName = relativeDay(day, today);
+  const label = dayName === formatDay(day) ? dayName : `${dayName} · ${formatDay(day)}`;
+
+  return (
+    <View style={[styles.dayPage, { width }]}>
+      <View style={styles.dateRow}>
+        <Pressable onPress={onPrev} hitSlop={12} accessibilityRole="button" accessibilityLabel="Previous day">
+          <Ionicons name="chevron-back" size={18} color={C.faint} />
+        </Pressable>
+        <Pressable onPress={onToday} disabled={!onToday} style={{ flex: 1, alignItems: 'center' }}>
+          <Text style={styles.dateText}>{label}</Text>
+        </Pressable>
+        <Pressable onPress={onNext} hitSlop={12} accessibilityRole="button" accessibilityLabel="Next day">
+          <Ionicons name="chevron-forward" size={18} color={C.faint} />
+        </Pressable>
+      </View>
+
+      <Ring size={168} stroke={18} progress={total.kcal / goals.kcal} color={ringColor}>
+        <Text style={styles.bigNum}>{thousands(total.kcal)}</Text>
+        <Text style={T.small}>of {thousands(goals.kcal)} kcal</Text>
+        <Text style={[styles.leftText, { color: status === 'none' ? C.muted : ringColor }]}>{leftText}</Text>
+      </Ring>
+
+      <View style={styles.macros}>
+        <MacroRing label="Protein" value={total.protein} goal={goals.protein} />
+        <MacroRing label="Carbs" value={total.carbs} goal={goals.carbs} />
+        <MacroRing label="Fat" value={total.fat} goal={goals.fat} />
+      </View>
+    </View>
+  );
+}
+
 function MacroRing({ label, value, goal }: { label: string; value: number; goal: number }) {
   return (
-    <View style={{ alignItems: 'center' }}>
-      <Ring size={66} stroke={9} progress={goal > 0 ? value / goal : 0} color={goal > 0 && value >= goal * 0.95 ? C.up : C.text}>
+    <View style={{ alignItems: 'center', flex: 1 }}>
+      <Ring size={52} stroke={7} progress={goal > 0 ? value / goal : 0} color={goal > 0 && value >= goal * 0.95 ? C.up : C.text}>
         <Text style={styles.macroPct}>{goal > 0 ? Math.round((value / goal) * 100) : 0}%</Text>
       </Ring>
-      <Text style={[T.small, { marginTop: 5, color: C.text, fontWeight: '600' }]}>{label}</Text>
-      <Text style={[T.small, T.num]}>
+      <Text style={[T.small, { marginTop: 6, color: C.text, fontWeight: '600' }]}>{label}</Text>
+      <Text style={[styles.macroNums, T.num]}>
         <Text style={{ color: C.text, fontWeight: '600' }}>{Math.round(value)}</Text> / {Math.round(goal)} g
       </Text>
     </View>
@@ -310,11 +431,15 @@ function GoalsSheet({ onClose }: { onClose: () => void }) {
 }
 
 const styles = StyleSheet.create({
-  dayCard: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 14, paddingVertical: 14, paddingLeft: 12, paddingRight: 12 },
-  bigNum: { color: C.text, fontSize: 46, fontWeight: '700', letterSpacing: -0.5, fontVariant: ['tabular-nums'] },
-  leftText: { fontSize: 14, fontWeight: '700', marginTop: 6 },
-  macros: { flex: 1, alignItems: 'center', gap: 10 },
-  macroPct: { color: C.text, fontSize: 13, fontWeight: '700', fontVariant: ['tabular-nums'] },
+  dayCard: { padding: 0, overflow: 'hidden', marginTop: 2 },
+  dayPage: { alignItems: 'center', paddingHorizontal: 16, paddingTop: 12, paddingBottom: 14 },
+  dateRow: { flexDirection: 'row', alignItems: 'center', alignSelf: 'stretch', marginBottom: 10 },
+  dateText: { color: C.text, fontSize: 15, fontWeight: '600', letterSpacing: -0.2 },
+  bigNum: { color: C.text, fontSize: 38, fontWeight: '700', letterSpacing: -0.5, fontVariant: ['tabular-nums'] },
+  leftText: { fontSize: 13, fontWeight: '700', marginTop: 4 },
+  macros: { flexDirection: 'row', marginTop: 14, alignSelf: 'stretch' },
+  macroPct: { color: C.text, fontSize: 11.5, fontWeight: '700', fontVariant: ['tabular-nums'] },
+  macroNums: { color: C.muted, fontSize: 12, marginTop: 1 },
   banner: {
     flexDirection: 'row',
     alignItems: 'center',
