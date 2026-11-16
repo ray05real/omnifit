@@ -113,6 +113,17 @@ Overload · Nutrition · Weight · Sleep · Metrics.
   exercises (Edit → "+ Cardio"): a name (Bike, Rower…) and lines of **time – watts** ("20min – 150W"); the
   second number can be switched in Edit to km, kcal or level. Same wheels, ticks and up / same / down
   (more time or more watts = up; if they go opposite ways, minutes × watts decides).
+- **Exercise options (the owner, 16 Nov 2026):** an exercise can have other versions of itself (e.g. "Preacher
+  curl" / "Single-arm preacher curl"), **each with its own weights and reps**. **No presets or catalogue: the owner
+  types each option's name, and a new option starts with empty numbers.** In Edit, chips under the exercise's
+  name: tap one to show and fill it in (the name box and sets are that option's), × removes one that isn't
+  showing, "+ Add an option" adds one. In the session, an exercise with options shows a small ⇄ badge next to its
+  name: **tap the name to swap** (a sheet lists each option with its last numbers and what's done today), even
+  halfway through: sets already ticked stay logged under the option they were done with, and "Done today: 1 set
+  of Preacher curl" shows under the name. Each option logs under its own id, so it has its own history and graph in
+  Metrics. Model: `Exercise.vid` (the option showing), `alts` (the others), `order`; helpers `optionId`,
+  `optionsOf` in `src/store/training.ts`. Cardio exercises can have options too (bike / rower); they share the
+  exercise's kind and metric.
 - **Round + button, bottom right** (the owner, 14 Nov 2026) on Nutrition, Weight and Sleep instead of the wide
   button, to leave room for the lists. **Nutrition's card is compact and carries the date**: swipe the card
   sideways (or tap its small arrows) to change day, tap the date to come back to today; no separate date bar.

@@ -9,7 +9,38 @@ import { phoneStorage, uid } from './persist';
 
 // An exercise's sets always show the last numbers done, like the owner's notes.
 // A cardio exercise (bike, rower…) keeps minutes in `weight` and its metric (watts by default) in `reps`.
-export type Exercise = { id: string; name: string; sets: SetVal[]; kind?: ExerciseKind; metric?: CardioMetric };
+//
+// Options (the owner, 16 Nov 2026): other versions of the same exercise, e.g. "Preacher curl" and "Single-arm
+// preacher curl". Each has its own id and remembers its own numbers; the one being done shows in the
+// exercise's own name / sets, the others wait in `alts`. Swapping trades them over, even halfway through.
+// Logged sets carry the option's id, so each option has its own history in Metrics.
+export type ExerciseOption = { id: string; name: string; sets: SetVal[] };
+export type Exercise = {
+  id: string; // the exercise's place in the session (stays the same whichever option is showing)
+  name: string; // the option showing now
+  sets: SetVal[];
+  kind?: ExerciseKind;
+  metric?: CardioMetric;
+  vid?: string; // the id of the option showing now (missing = the exercise's own id: the first option)
+  alts?: ExerciseOption[]; // the other options
+  order?: string[]; // every option's id, in the order they were added
+};
+
+// The id the option showing now logs its sets under.
+export function optionId(ex: Exercise): string {
+  return ex.vid ?? ex.id;
+}
+
+// Every option of an exercise, the one showing now included, in the order they were added.
+export function optionsOf(ex: Exercise): ExerciseOption[] {
+  const all = [{ id: optionId(ex), name: ex.name, sets: ex.sets }, ...(ex.alts ?? [])];
+  const order = ex.order ?? [];
+  const rank = (id: string) => {
+    const i = order.indexOf(id);
+    return i < 0 ? order.length : i;
+  };
+  return all.sort((a, b) => rank(a.id) - rank(b.id));
+}
 export type Session = { id: string; name: string; exercises: Exercise[] };
 
 type State = {
@@ -25,6 +56,9 @@ type State = {
   renameExercise: (sessionId: string, exId: string, name: string) => void;
   deleteExercise: (sessionId: string, exId: string) => void;
   moveExercise: (sessionId: string, from: number, to: number) => void;
+  addOption: (sessionId: string, exId: string) => string; // a new, empty option, shown straight away
+  switchOption: (sessionId: string, exId: string, optionId: string) => void;
+  removeOption: (sessionId: string, exId: string, optionId: string) => void; // not the one showing
   addSet: (sessionId: string, exId: string) => void;
   removeSet: (sessionId: string, exId: string, index: number, today: DateKey) => void;
   // Edit mode: change a set's numbers without logging a workout.
@@ -110,6 +144,56 @@ export const useTraining = create<State>()(
           }),
         })),
 
+      addOption: (sessionId, exId) => {
+        const id = uid();
+        set((st) => ({
+          sessions: mapExercise(st.sessions, sessionId, exId, (e) => {
+            const current: ExerciseOption = { id: optionId(e), name: e.name, sets: e.sets };
+            return {
+              ...e,
+              vid: id,
+              name: '',
+              // As many sets as the one it's an option of; its numbers are its own, so they start empty.
+              sets: e.sets.map(() => ({ weight: 0, reps: 0 })),
+              alts: [...(e.alts ?? []), current],
+              order: [...(e.order ?? [current.id]), id],
+            };
+          }),
+        }));
+        return id;
+      },
+
+      switchOption: (sessionId, exId, target) =>
+        set((st) => ({
+          sessions: mapExercise(st.sessions, sessionId, exId, (e) => {
+            const next = (e.alts ?? []).find((a) => a.id === target);
+            if (!next || target === optionId(e)) return e;
+            const current: ExerciseOption = { id: optionId(e), name: e.name, sets: e.sets };
+            return {
+              ...e,
+              vid: next.id,
+              name: next.name,
+              sets: next.sets,
+              alts: [...(e.alts ?? []).filter((a) => a.id !== target), current],
+              order: e.order ?? [current.id, ...(e.alts ?? []).map((a) => a.id)],
+            };
+          }),
+        })),
+
+      // What was already logged with it stays in Metrics.
+      removeOption: (sessionId, exId, target) =>
+        set((st) => ({
+          sessions: mapExercise(st.sessions, sessionId, exId, (e) =>
+            target === optionId(e)
+              ? e
+              : {
+                  ...e,
+                  alts: (e.alts ?? []).filter((a) => a.id !== target),
+                  order: (e.order ?? []).filter((id) => id !== target),
+                },
+          ),
+        })),
+
       // A new set starts from the numbers of the one above it.
       addSet: (sessionId, exId) =>
         set((st) => ({
@@ -120,7 +204,10 @@ export const useTraining = create<State>()(
         })),
 
       removeSet: (sessionId, exId, index, today) =>
-        set((st) => ({
+        set((st) => {
+          const ex = st.sessions.find((s) => s.id === sessionId)?.exercises.find((e) => e.id === exId);
+          const oid = ex ? optionId(ex) : exId;
+          return {
           sessions: mapExercise(st.sessions, sessionId, exId, (e) => ({
             ...e,
             sets: e.sets.filter((_, i) => i !== index),
@@ -133,14 +220,15 @@ export const useTraining = create<State>()(
                 : {
                     ...w,
                     sets: w.sets
-                      .filter((s) => !(s.exerciseId === exId && s.setIndex === index))
+                      .filter((s) => !(s.exerciseId === oid && s.setIndex === index))
                       .map((s) =>
-                        s.exerciseId === exId && s.setIndex > index ? { ...s, setIndex: s.setIndex - 1 } : s,
+                        s.exerciseId === oid && s.setIndex > index ? { ...s, setIndex: s.setIndex - 1 } : s,
                       ),
                   },
             )
             .filter((w) => w.sets.length > 0),
-        })),
+          };
+        }),
 
       setNumbers: (sessionId, exId, index, val) =>
         set((st) => ({
@@ -156,6 +244,7 @@ export const useTraining = create<State>()(
           const ex = session?.exercises.find((e) => e.id === exId);
           if (!session || !ex || !ex.sets[index]) return st;
           const before = ex.sets[index];
+          const oid = optionId(ex);
 
           const workouts = st.workouts.slice();
           let wi = workouts.findIndex((w) => w.date === date && w.sessionId === sessionId);
@@ -164,13 +253,13 @@ export const useTraining = create<State>()(
             wi = workouts.length - 1;
           }
           const w = { ...workouts[wi], sessionName: session.name, sets: workouts[wi].sets.slice() };
-          const si = w.sets.findIndex((s) => s.exerciseId === exId && s.setIndex === index);
+          const si = w.sets.findIndex((s) => s.exerciseId === oid && s.setIndex === index);
           if (si >= 0) {
             // Changing a set already logged today: what it's compared with stays the last time's numbers.
             w.sets[si] = { ...w.sets[si], exerciseName: ex.name, weight: val.weight, reps: val.reps, ...kindOf(ex) };
           } else {
             w.sets.push({
-              exerciseId: exId,
+              exerciseId: oid,
               exerciseName: ex.name,
               setIndex: index,
               weight: val.weight,
@@ -194,7 +283,9 @@ export const useTraining = create<State>()(
       unlogSet: (sessionId, exId, index, date) =>
         set((st) => {
           const w = st.workouts.find((x) => x.date === date && x.sessionId === sessionId);
-          const logged = w?.sets.find((s) => s.exerciseId === exId && s.setIndex === index);
+          const ex = st.sessions.find((s) => s.id === sessionId)?.exercises.find((e) => e.id === exId);
+          const oid = ex ? optionId(ex) : exId;
+          const logged = w?.sets.find((s) => s.exerciseId === oid && s.setIndex === index);
           if (!w || !logged) return st;
           const sets = w.sets.filter((s) => s !== logged);
           const prev = logged.prev;

@@ -41,7 +41,7 @@ import {
   type Workout,
 } from '../lib/overload';
 import { useToday } from '../store/hooks';
-import { useTraining, type Exercise, type Session } from '../store/training';
+import { optionId, optionsOf, useTraining, type Exercise, type Session } from '../store/training';
 import { C, T, alpha, changeColor } from '../theme';
 import variant from '../../variant.json';
 
@@ -180,6 +180,7 @@ function SessionView({ session, startInEdit, onBack }: { session: Session; start
   const [edit, setEdit] = useState(startInEdit);
   const [wheel, setWheel] = useState<WheelTarget | null>(null);
   const [fresh, setFresh] = useState<string | null>(null); // the exercise just added: its name box gets the keyboard
+  const [swapping, setSwapping] = useState<string | null>(null); // the exercise whose options are open
 
   const workouts = useTraining((s) => s.workouts);
   const t = useTraining.getState(); // the actions never change
@@ -192,7 +193,7 @@ function SessionView({ session, startInEdit, onBack }: { session: Session; start
 
   const wheelEx = wheel ? session.exercises.find((e) => e.id === wheel.exId) : undefined;
   const wheelSet = wheel && wheelEx ? wheelEx.sets[wheel.index] : undefined;
-  const wheelLogged = wheel ? loggedSet(wheel.exId, wheel.index) : undefined;
+  const wheelLogged = wheel && wheelEx ? loggedSet(optionId(wheelEx), wheel.index) : undefined;
 
   const total = session.exercises.reduce((n, e) => n + e.sets.length, 0);
   const done = todays ? todays.sets.length : 0;
@@ -203,9 +204,23 @@ function SessionView({ session, startInEdit, onBack }: { session: Session; start
     setFresh(null);
   };
 
+  // Sets logged today with the exercise's other options (done before a swap), as "1 set of Preacher curl".
+  const doneWithOthers = (ex: Exercise): string => {
+    if (!todays || !ex.alts?.length) return '';
+    const parts: string[] = [];
+    for (const a of ex.alts) {
+      const n = todays.sets.filter((s) => s.exerciseId === a.id).length;
+      if (n > 0) parts.push(`${n} ${n === 1 ? 'set' : 'sets'} of ${a.name || 'the other option'}`);
+    }
+    return parts.join(', ');
+  };
+
   const renderExercise = (ex: Exercise, { lifted, last }: { lifted: boolean; last: boolean }) => {
     const kind: ExerciseKind = ex.kind ?? 'strength';
     const metric: CardioMetric = ex.metric ?? 'W';
+    const options = optionsOf(ex);
+    const others = doneWithOthers(ex);
+    const untitled = kind === 'cardio' ? 'Cardio' : 'Untitled exercise';
     return (
       <View style={[styles.exercise, !last && !lifted && styles.line]}>
         {edit ? (
@@ -245,10 +260,84 @@ function SessionView({ session, startInEdit, onBack }: { session: Session; start
                 <Segmented options={CARDIO_METRICS} value={metric} onChange={(m) => t.setMetric(session.id, ex.id, m)} />
               </View>
             ) : null}
+            {/* Options: other versions of this exercise, each with its own numbers. The name box and the sets
+                below are the option that's highlighted; tap another to fill it in. */}
+            <View style={styles.chips}>
+              {options.length > 1
+                ? options.map((op, n) => {
+                    const on = op.id === optionId(ex);
+                    return (
+                      <Pressable
+                        key={op.id}
+                        onPress={() => {
+                          buzz();
+                          t.switchOption(session.id, ex.id, op.id);
+                        }}
+                        accessibilityRole="button"
+                        accessibilityState={{ selected: on }}
+                        style={[styles.chip, on && styles.chipOn]}
+                      >
+                        <Text style={[styles.chipText, on && { color: C.ink }]} numberOfLines={1}>
+                          {op.name || `Option ${n + 1}`}
+                        </Text>
+                        {!on ? (
+                          <Pressable
+                            hitSlop={8}
+                            accessibilityRole="button"
+                            accessibilityLabel={`Remove ${op.name || 'this option'}`}
+                            onPress={() =>
+                              confirmAction(
+                                `Remove ${op.name || 'this option'}?`,
+                                'It stops being an option here. What you already logged with it stays in Metrics.',
+                                'Remove',
+                                () => t.removeOption(session.id, ex.id, op.id),
+                              )
+                            }
+                          >
+                            <Ionicons name="close-circle" size={16} color={C.faint} />
+                          </Pressable>
+                        ) : null}
+                      </Pressable>
+                    );
+                  })
+                : null}
+              <Pressable
+                onPress={() => {
+                  buzz();
+                  t.addOption(session.id, ex.id);
+                  setFresh(ex.id);
+                }}
+                accessibilityRole="button"
+                style={[styles.chip, styles.chipAdd]}
+              >
+                <Ionicons name="add" size={15} color={C.muted} />
+                <Text style={[styles.chipText, { color: C.muted }]}>{options.length > 1 ? 'Option' : 'Add an option'}</Text>
+              </Pressable>
+            </View>
           </>
+        ) : options.length > 1 ? (
+          // Tap the name to swap to another option, even halfway through.
+          <Pressable
+            onPress={() => {
+              buzz();
+              setSwapping(ex.id);
+            }}
+            accessibilityRole="button"
+            accessibilityLabel={`${ex.name || untitled}. Tap to swap to another option.`}
+            style={({ pressed }) => [styles.swapName, pressed && { opacity: 0.6 }]}
+          >
+            <Text style={[styles.exName, { marginBottom: 0, flexShrink: 1 }]} numberOfLines={1}>
+              {ex.name || untitled}
+            </Text>
+            <View style={styles.swapBadge}>
+              <Ionicons name="swap-horizontal" size={13} color={C.muted} />
+              <Text style={styles.swapBadgeText}>{options.length}</Text>
+            </View>
+          </Pressable>
         ) : (
-          <Text style={styles.exName}>{ex.name || (kind === 'cardio' ? 'Cardio' : 'Untitled exercise')}</Text>
+          <Text style={styles.exName}>{ex.name || untitled}</Text>
         )}
+        {!edit && others ? <Text style={styles.othersDone}>Done today: {others}</Text> : null}
 
         {ex.sets.map((s, i) => (
           <SetRow
@@ -257,12 +346,12 @@ function SessionView({ session, startInEdit, onBack }: { session: Session; start
             set={s}
             kind={kind}
             metric={metric}
-            logged={loggedSet(ex.id, i)}
+            logged={loggedSet(optionId(ex), i)}
             edit={edit}
             onWeight={() => setWheel({ exId: ex.id, index: i, part: 'weight' })}
             onReps={() => setWheel({ exId: ex.id, index: i, part: 'reps' })}
             onTick={() => {
-              const lg = loggedSet(ex.id, i);
+              const lg = loggedSet(optionId(ex), i);
               if (lg) {
                 buzz();
                 t.unlogSet(session.id, ex.id, i, today);
@@ -386,6 +475,19 @@ function SessionView({ session, startInEdit, onBack }: { session: Session; start
           Tap a number to change it with the wheel.{'\n'}Tap the circle when it's done as written.{'\n'}Press and hold an
           exercise, then drag it to reorder.
         </Text>
+      ) : null}
+
+      {swapping ? (
+        <SwapSheet
+          exercise={session.exercises.find((e) => e.id === swapping)}
+          doneToday={(id) => (todays ? todays.sets.filter((s) => s.exerciseId === id).length : 0)}
+          onPick={(id) => {
+            buzz('done');
+            t.switchOption(session.id, swapping, id);
+            setSwapping(null);
+          }}
+          onClose={() => setSwapping(null)}
+        />
       ) : null}
 
       {wheel && wheelEx && wheelSet ? (
@@ -512,6 +614,60 @@ function SetRow({
         </Pressable>
       )}
     </View>
+  );
+}
+
+// ───────────────────────── Swap to another option ─────────────────────────
+
+function SwapSheet({
+  exercise,
+  doneToday,
+  onPick,
+  onClose,
+}: {
+  exercise: Exercise | undefined;
+  doneToday: (optionId: string) => number;
+  onPick: (optionId: string) => void;
+  onClose: () => void;
+}) {
+  if (!exercise) return null;
+  const kind = exercise.kind ?? 'strength';
+  const metric = exercise.metric ?? 'W';
+  const current = optionId(exercise);
+  return (
+    <Sheet visible onClose={onClose} title="Swap exercise" subtitle="Each one keeps its own weights and reps.">
+      <View style={{ marginTop: 10, marginBottom: 4 }}>
+        {optionsOf(exercise).map((op, n, all) => {
+          const on = op.id === current;
+          const done = doneToday(op.id);
+          const numbers = op.sets.filter((s) => !isBlank(s)).map((s) => setLabel(s, kind, metric));
+          return (
+            <Pressable
+              key={op.id}
+              onPress={() => (on ? onClose() : onPick(op.id))}
+              accessibilityRole="button"
+              accessibilityState={{ selected: on }}
+              style={({ pressed }) => [styles.swapRow, n < all.length - 1 && styles.line, pressed && { opacity: 0.6 }]}
+            >
+              <View style={{ flex: 1 }}>
+                <Text style={[T.headline, on && { color: C.text }]} numberOfLines={1}>
+                  {op.name || `Option ${n + 1}`}
+                </Text>
+                <Text style={[T.small, { marginTop: 2 }]} numberOfLines={1}>
+                  {numbers.length ? numbers.slice(0, 4).join(' · ') : 'No numbers yet'}
+                </Text>
+                {done > 0 ? (
+                  <Text style={[T.small, { color: C.up, marginTop: 2 }]}>
+                    {done} {done === 1 ? 'set' : 'sets'} done today
+                  </Text>
+                ) : null}
+              </View>
+              <Ionicons name={on ? 'checkmark-circle' : 'ellipse-outline'} size={24} color={on ? C.text : C.faint} />
+            </Pressable>
+          );
+        })}
+      </View>
+    </Sheet>
   );
 }
 
@@ -649,6 +805,33 @@ const styles = StyleSheet.create({
     marginRight: 2,
   },
   handle: { width: 40, height: 42, alignItems: 'center', justifyContent: 'center' },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 6 },
+  chip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    height: 30,
+    paddingHorizontal: 11,
+    borderRadius: 15,
+    backgroundColor: C.card2,
+    maxWidth: '100%',
+  },
+  chipOn: { backgroundColor: C.text },
+  chipAdd: { backgroundColor: 'transparent', borderWidth: StyleSheet.hairlineWidth, borderColor: C.line },
+  chipText: { color: C.text, fontSize: 14, fontWeight: '600', flexShrink: 1 },
+  swapName: { flexDirection: 'row', alignItems: 'center', gap: 8, alignSelf: 'flex-start', maxWidth: '100%', marginBottom: 2 },
+  swapBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    paddingHorizontal: 7,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: C.card2,
+  },
+  swapBadgeText: { color: C.muted, fontSize: 12, fontWeight: '700' },
+  othersDone: { color: C.up, fontSize: 13, marginBottom: 2 },
+  swapRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12 },
   addRow: { flexDirection: 'row', gap: 10, marginTop: 10 },
 
   setRow: { flexDirection: 'row', alignItems: 'center', minHeight: 31 },

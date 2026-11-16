@@ -44,7 +44,7 @@ import {
 import { useBody } from '../store/body';
 import { useToday } from '../store/hooks';
 import { useNutrition } from '../store/nutrition';
-import { useTraining } from '../store/training';
+import { optionsOf, useTraining } from '../store/training';
 import { C, T, changeColor } from '../theme';
 import { nightLabel, sleepColor } from './SleepScreen';
 
@@ -453,7 +453,10 @@ function GraphView({ metric, color, today }: { metric: Metric; color: string; to
     }
     for (const sess of d.sessions) {
       for (const e of sess.exercises) {
-        if (m.has(e.id)) m.set(e.id, { name: e.name || 'Exercise', kind: e.kind ?? 'strength', unit: e.metric ?? 'W' });
+        // Each option of an exercise (e.g. single-arm) has its own history, under its own current name.
+        for (const op of optionsOf(e)) {
+          if (m.has(op.id)) m.set(op.id, { name: op.name || 'Exercise', kind: e.kind ?? 'strength', unit: e.metric ?? 'W' });
+        }
       }
     }
     return [...m.entries()].map(([id, v]) => ({ id, ...v }));
