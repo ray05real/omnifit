@@ -12,6 +12,7 @@ export type Food = Macros & {
   name: string;
   unit: FoodUnit;
   lastUsed: number;
+  pack?: number; // grams or ml in a whole pack, when known: for "half a pack"
 };
 
 export type FoodEntry = Macros & {

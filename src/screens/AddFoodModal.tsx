@@ -41,6 +41,7 @@ import {
   type FoodUnit,
   type Macros,
 } from '../lib/nutrition';
+import { barcodeLookup, scanAvailable, scanPack } from '../scan/scan';
 import { useToday } from '../store/hooks';
 import { useNutrition } from '../store/nutrition';
 import { C, PAD, T } from '../theme';
@@ -241,6 +242,32 @@ function AmountView({
         autoFocus
         selectTextOnFocus
       />
+      {food.pack && food.unit !== 'serving' ? (
+        <View style={styles.packRow}>
+          {(
+            [
+              ['¼ pack', 0.25],
+              ['½ pack', 0.5],
+              ['Whole pack', 1],
+            ] as const
+          ).map(([label, part]) => (
+            <Pressable
+              key={label}
+              onPress={() => {
+                buzz();
+                setAmount(String(round1(food.pack! * part)));
+              }}
+              accessibilityRole="button"
+              style={styles.packChip}
+            >
+              <Text style={styles.packChipText}>{label}</Text>
+              <Text style={T.small}>
+                {round1(food.pack! * part)} {food.unit}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+      ) : null}
       <PrimaryButton
         label="Log it"
         color={C.nutrition}
@@ -271,16 +298,73 @@ function FoodForm({
   const [protein, setProtein] = useState(food ? String(food.protein) : '');
   const [carbs, setCarbs] = useState(food ? String(food.carbs) : '');
   const [fat, setFat] = useState(food ? String(food.fat) : '');
+  const [pack, setPack] = useState(food?.pack ? String(food.pack) : '');
+  const [scanning, setScanning] = useState(false);
+  const [note, setNote] = useState<{ text: string; ok: boolean } | null>(null);
 
   const macros = { protein: parseNum(protein), carbs: parseNum(carbs), fat: parseNum(fat) };
   const fromMacros = macroKcal(macros);
+  const packSize = unit === 'serving' ? 0 : Math.round(parseNum(pack));
   // Calories left blank are worked out from the macros.
-  const data = { name: name.trim(), unit, kcal: Math.round(parseNum(kcal)) || fromMacros, ...macros };
+  const data = {
+    name: name.trim(),
+    unit,
+    kcal: Math.round(parseNum(kcal)) || fromMacros,
+    ...macros,
+    pack: packSize > 0 ? packSize : undefined,
+  };
+
+  // Photograph the pack: the numbers are read off it and filled in below, to be checked before saving.
+  const scan = async () => {
+    setScanning(true);
+    setNote(null);
+    const r = await scanPack();
+    setScanning(false);
+    if (r.status === 'cancelled') return;
+    if (r.status === 'no-camera') {
+      return setNote({ ok: false, text: 'Omniload isn’t allowed to use the camera. Switch it on in Settings → Omniload.' });
+    }
+    if (r.status === 'error') return setNote({ ok: false, text: 'The photo couldn’t be read (' + r.message + ').' });
+    if (r.status === 'nothing') {
+      return setNote({
+        ok: false,
+        text:
+          (r.sawBarcode && barcodeLookup
+            ? 'That barcode isn’t in the food database, and no nutrition table was in the photo. '
+            : 'No nutrition table could be read. ') +
+          'Hold the phone straight over the table so it fills the picture, without glare, and try again; or type the numbers.',
+      });
+    }
+    const v = r.values;
+    buzz('done');
+    setUnit(v.unit);
+    if (v.kcal !== undefined) setKcal(String(v.kcal));
+    if (v.protein !== undefined) setProtein(String(v.protein));
+    if (v.carbs !== undefined) setCarbs(String(v.carbs));
+    if (v.fat !== undefined) setFat(String(v.fat));
+    if (v.pack) setPack(String(v.pack));
+    if (v.name && !name.trim()) setName(v.name);
+    const missing = v.found < 4 ? ' Only ' + v.found + ' of the 4 numbers were found: fill in the rest.' : '';
+    setNote({
+      ok: true,
+      text: (v.source === 'barcode' ? 'Found by its barcode (Open Food Facts).' : 'Read from the pack.') + ' Check the numbers before saving.' + missing,
+    });
+  };
   const ok = data.name.length > 0 && (data.kcal > 0 || fromMacros > 0);
 
   return (
     <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-      <Field label="Name" value={name} onChangeText={setName} placeholder="e.g. Chicken breast" autoFocus={!food} maxLength={60} />
+      {scanAvailable ? (
+        <GhostButton
+          label={scanning ? 'Reading the photo…' : barcodeLookup ? 'Scan the barcode or the nutrition table' : 'Scan the nutrition table'}
+          icon="scan-outline"
+          color={C.text}
+          onPress={scanning ? () => {} : scan}
+          style={{ marginTop: 6 }}
+        />
+      ) : null}
+      {note ? <Text style={[T.small, { marginTop: 8, lineHeight: 18, color: note.ok ? C.up : C.muted }]}>{note.text}</Text> : null}
+      <Field label="Name" value={name} onChangeText={setName} placeholder="e.g. Chicken breast" autoFocus={!food && !scanAvailable} maxLength={60} />
       <Text style={[T.label, { marginTop: 14, marginBottom: 6 }]}>The numbers below are</Text>
       <Segmented
         options={[
@@ -305,6 +389,16 @@ function FoodForm({
         <Field label="Carbs" value={carbs} onChangeText={setCarbs} keyboardType="decimal-pad" suffix="g" placeholder="0" containerStyle={{ flex: 1 }} />
         <Field label="Fat" value={fat} onChangeText={setFat} keyboardType="decimal-pad" suffix="g" placeholder="0" containerStyle={{ flex: 1 }} />
       </View>
+      {unit !== 'serving' ? (
+        <Field
+          label="Whole pack (optional, for half a pack)"
+          value={pack}
+          onChangeText={setPack}
+          keyboardType="decimal-pad"
+          suffix={unit}
+          placeholder="e.g. 180"
+        />
+      ) : null}
       <PrimaryButton
         label={food ? 'Save changes' : 'Save to My foods'}
         color={C.nutrition}
@@ -437,5 +531,8 @@ const styles = StyleSheet.create({
   macroLine: { flexDirection: 'row', alignItems: 'baseline', gap: 6, marginTop: 10 },
   kcal: { color: C.text, fontSize: 34, fontWeight: '800', letterSpacing: -0.6, fontVariant: ['tabular-nums'] },
   macro: { fontSize: 15, fontWeight: '700', marginLeft: 8, fontVariant: ['tabular-nums'] },
+  packRow: { flexDirection: 'row', gap: 8, marginTop: 12 },
+  packChip: { flex: 1, alignItems: 'center', backgroundColor: C.card2, borderRadius: 14, paddingVertical: 9 },
+  packChipText: { color: C.text, fontSize: 15, fontWeight: '600' },
   keepRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 18 },
 });

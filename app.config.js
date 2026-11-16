@@ -8,7 +8,16 @@ const variant = require('./variant.json');
 module.exports = ({ config }) => ({
   ...config,
   plugins: [
-    ...(config.plugins ?? []),
+    ...(config.plugins ?? []).filter((p) => p !== 'expo-image-picker'),
+    [
+      'expo-image-picker',
+      {
+        cameraPermission:
+          'Omniload uses the camera to read the nutrition table on a food pack. The photo is read on your phone and is not kept or sent anywhere.',
+        photosPermission: false,
+        microphonePermission: false,
+      },
+    ],
     ...(variant.scale
       ? [
           [

@@ -1,0 +1,7 @@
+{
+  "name": "label-reader",
+  "version": "1.0.0",
+  "description": "Reads the text and the barcodes in a photo, on the phone itself (Apple's Vision). Nothing is sent anywhere.",
+  "main": "index.ts",
+  "private": true
+}
