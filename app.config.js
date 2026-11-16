@@ -8,14 +8,14 @@ const variant = require('./variant.json');
 module.exports = ({ config }) => ({
   ...config,
   plugins: [
-    ...(config.plugins ?? []).filter((p) => p !== 'expo-image-picker'),
+    ...(config.plugins ?? []).filter((p) => p !== 'expo-camera' && p !== 'expo-image-picker'),
     [
-      'expo-image-picker',
+      'expo-camera',
       {
         cameraPermission:
-          'Omniload uses the camera to read the nutrition table on a food pack. The photo is read on your phone and is not kept or sent anywhere.',
-        photosPermission: false,
+          'Omniload uses the camera to read the nutrition table or the barcode on a food pack. The pictures are read on your phone and are not kept.',
         microphonePermission: false,
+        recordAudioAndroid: false,
       },
     ],
     ...(variant.scale

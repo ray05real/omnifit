@@ -119,20 +119,27 @@ Overload · Nutrition · Weight · Sleep · Metrics.
   **Tapping a logged food edits all of it in one place** (name, amount, calories, macros, time; delete).
 - **The owner went back to build 6 on 16 Nov 2026** (two later Nutrition layouts and swipe-right-to-go-back in a
   session were reverted; don't bring them back unasked).
-- **Scan the pack (the owner, 16 Nov 2026).** In the new-food form, one button takes a photo of the pack and
-  fills in calories, protein, carbs and fat, to be checked before saving. **The owner's rule: no AI service, no
-  data collection, everything on the phone.**
-  - **Both versions: the nutrition table is read on the phone.** `modules/label-reader` is a tiny local Expo
-    module (Swift, Apple's Vision: text with positions, and barcodes); `src/lib/label.ts` puts the pieces back
-    into rows, finds the "per 100 g" column and picks out the four numbers (tested: UK, Italian, per-serving
-    column first, a "g" misread as 9). Nothing leaves the phone. It will sometimes misread: the form says to check.
-  - **Only the owner's version (`variant.json` "scale": true) also looks a barcode up** in Open Food Facts
-    (free, no account; only the barcode's digits are sent), which also gives the name and the pack size.
-    **The standard version must never make a network request**: keep the lookup behind `barcodeLookup`
-    (`src/scan/scan.ts`).
+- **Scan the pack (the owner, 16 Nov 2026).** In the new-food form, **two separate buttons: "Barcode" and
+  "Nutrition table"** (the standard version shows only the nutrition table). Each opens a **live camera like an
+  ID check** (`src/scan/ScanCamera.tsx`): a box to line the pack up in, **grey while it works, green when it
+  can read it**, and a line under it saying what's happening ("Point the camera at…", "Move closer so the table
+  fills the box", "Hold steady… focusing", "Ready: tap the button"). The numbers are filled into the form, to be
+  checked before saving. **The owner's rule: no AI service, no data collection, everything on the phone.**
+  - **Nutrition table (both versions), read on the phone:** every second or so a frame is taken silently,
+    shrunk and read by `modules/label-reader` (a tiny local Expo module in Swift: Apple's Vision, text with
+    positions); `src/lib/label.ts` finds each nutrient's name, the numbers level with it to its right (tolerant
+    of a slight tilt and tight rows), the "per 100 g" column by its heading, fixes common misreads (O for 0,
+    "g" read as 9), and `combineReadings` keeps what most frames agree on. **Green = two frames agree on
+    protein, carbs and fat.** The button then takes a sharp photo, which counts double. Nothing leaves the phone.
+  - **Barcode (only the owner's version, `variant.json` "scale": true):** the camera spots the barcode by
+    itself (check digit verified), then looks it up in Open Food Facts (free, no account; only the barcode's
+    digits are sent), which also gives the name and the pack size. If it isn't there: "Scan the nutrition table
+    instead". **The standard version must never make a network request**: `lookUpBarcode` in `src/scan/scan.ts`
+    returns nothing unless `barcodeLookup`.
   - **"Half a pack":** a food can have a whole-pack size (typed, or from the barcode); logging it then offers
     ¼ pack / ½ pack / Whole pack next to typing the grams.
-  - Not yet confirmed on the owner's phone (the camera and Vision can't run on the PC).
+  - The first version (one button, a single photo) "only picked up some numbers" on the owner's phone (16 Nov);
+    this live version is not yet confirmed there.
 - **Testing is by sideloaded .ipa now** (the owner, 14 Nov 2026), same as the To Do app: every push to GitHub
   builds unsigned .ipa files on GitHub's Macs (`.github/workflows/build.yml`) and publishes them as a Release;
   the owner signs them in Kravasigner. The repository is public for that (free Mac builds, direct links).

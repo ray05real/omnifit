@@ -1,16 +1,14 @@
-// "Scan the pack": take a photo of a food pack and get its calories and macros.
+// "Scan the pack": what the two scanners hand back, and the barcode lookup.
 //
-// Reading the photo happens on the phone (modules/label-reader, Apple's own text and barcode reading).
-// In the standard version that is all there is: nothing leaves the phone. In the owner's own version
-// (variant.json "scale": true) a barcode in the photo is also looked up in Open Food Facts, a free public
-// food database: only the barcode's digits are sent, nothing about the person.
+// Reading the nutrition table happens on the phone (modules/label-reader, Apple's own text reading); in the
+// standard version that is all there is, and nothing leaves the phone. Only the owner's own version
+// (variant.json "scale": true) has the barcode scanner, which looks the barcode up in Open Food Facts, a free
+// public food database: only the barcode's digits are sent, nothing about the person.
 
 import { Platform } from 'react-native';
-import * as ImagePicker from 'expo-image-picker';
 
-import { labelReaderAvailable, scanPhoto } from '../../modules/label-reader';
+import { labelReaderAvailable } from '../../modules/label-reader';
 import variant from '../../variant.json';
-import { parseLabel } from '../lib/label';
 import type { FoodUnit } from '../lib/nutrition';
 
 export const scanAvailable = Platform.OS === 'ios' && labelReaderAvailable;
@@ -28,36 +26,6 @@ export type PackValues = {
   found: number; // how many of calories / protein / carbs / fat were read
 };
 
-export type PackScan =
-  | { status: 'ok'; values: PackValues }
-  | { status: 'cancelled' }
-  | { status: 'no-camera' } // camera permission refused
-  | { status: 'nothing'; sawBarcode: boolean } // no table could be read (and no barcode match)
-  | { status: 'error'; message: string };
-
-export async function scanPack(): Promise<PackScan> {
-  try {
-    const permission = await ImagePicker.requestCameraPermissionsAsync();
-    if (!permission.granted) return { status: 'no-camera' };
-    const shot = await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], quality: 0.9, exif: false });
-    if (shot.canceled || !shot.assets?.[0]) return { status: 'cancelled' };
-
-    const { lines, barcodes } = await scanPhoto(shot.assets[0].uri);
-    const code = barcodes.find((b) => /^\d{8,14}$/.test(b));
-
-    if (barcodeLookup && code) {
-      const product = await lookUpBarcode(code).catch(() => null);
-      if (product && product.found > 0) return { status: 'ok', values: product };
-    }
-
-    const label = parseLabel(lines);
-    if (label.found > 0) return { status: 'ok', values: { source: 'label', ...label } };
-    return { status: 'nothing', sawBarcode: !!code };
-  } catch (e) {
-    return { status: 'error', message: e instanceof Error ? e.message : String(e) };
-  }
-}
-
 const num = (v: unknown): number | undefined => {
   const n = typeof v === 'string' ? parseFloat(v) : typeof v === 'number' ? v : NaN;
   return Number.isFinite(n) && n >= 0 ? n : undefined;
@@ -65,7 +33,9 @@ const num = (v: unknown): number | undefined => {
 const round1 = (v: number | undefined) => (v === undefined ? undefined : Math.round(v * 10) / 10);
 
 // Open Food Facts (openfoodfacts.org): free, no account. Values are per 100 g or 100 ml.
-async function lookUpBarcode(code: string): Promise<PackValues | null> {
+// null = not in the database (or no internet).
+export async function lookUpBarcode(code: string): Promise<PackValues | null> {
+  if (!barcodeLookup) return null; // the standard version never goes online
   const stop = new AbortController();
   const timer = setTimeout(() => stop.abort(), 8000);
   try {
@@ -89,6 +59,8 @@ async function lookUpBarcode(code: string): Promise<PackValues | null> {
     const name = [brand && !product.toLowerCase().includes(brand.toLowerCase()) ? brand : '', product].filter(Boolean).join(' ');
     const liquid = /^(ml|cl|l)$/i.test(String(p.product_quantity_unit ?? '')) || /\d\s*(ml|cl|l)\b/i.test(String(p.quantity ?? ''));
     const pack = num(p.product_quantity);
+    const found = [kcal, protein, carbs, fat].filter((v) => v !== undefined).length;
+    if (found === 0) return null;
     return {
       source: 'barcode',
       name: name || undefined,
@@ -98,8 +70,10 @@ async function lookUpBarcode(code: string): Promise<PackValues | null> {
       carbs,
       fat,
       pack: pack && pack > 0 ? Math.round(pack) : undefined,
-      found: [kcal, protein, carbs, fat].filter((v) => v !== undefined).length,
+      found,
     };
+  } catch {
+    return null;
   } finally {
     clearTimeout(timer);
   }

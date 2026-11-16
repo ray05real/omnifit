@@ -16,14 +16,26 @@ public class LabelReaderModule: Module {
   public func definition() -> ModuleDefinition {
     Name("LabelReader")
 
-    // uri: a photo on the phone (file://…). Returns { lines: [{ text, x, y, w, h }], barcodes: [String] },
-    // with positions as fractions of the picture, measured from its top-left corner.
-    AsyncFunction("scan") { (uri: String) -> [String: Any] in
+    // uri: a photo on the phone (file://…).
+    // maxSide: shrink the photo so its longest side is at most this many pixels first (0 = keep it as it is);
+    //   the live camera checks smaller frames, which is much quicker.
+    // deleteAfter: remove the photo once it has been read (the live camera's frames are not kept).
+    // Returns { lines: [{ text, x, y, w, h }], barcodes: [String] }, with positions as fractions of the
+    // picture, measured from its top-left corner.
+    AsyncFunction("scan") { (uri: String, maxSide: Int, deleteAfter: Bool) -> [String: Any] in
       guard let url = URL(string: uri),
         let data = try? Data(contentsOf: url),
-        let image = UIImage(data: data),
-        let cgImage = image.cgImage
+        let original = UIImage(data: data)
       else {
+        throw PhotoUnreadableException()
+      }
+      if deleteAfter {
+        try? FileManager.default.removeItem(at: url)
+      }
+
+      // Redrawing also turns the picture the right way up.
+      let image = LabelReaderModule.upright(original, maxSide: CGFloat(maxSide))
+      guard let cgImage = image.cgImage else {
         throw PhotoUnreadableException()
       }
 
@@ -33,11 +45,7 @@ public class LabelReaderModule: Module {
       textRequest.usesLanguageCorrection = false
       let barcodeRequest = VNDetectBarcodesRequest()
 
-      let handler = VNImageRequestHandler(
-        cgImage: cgImage,
-        orientation: LabelReaderModule.orientation(of: image),
-        options: [:]
-      )
+      let handler = VNImageRequestHandler(cgImage: cgImage, orientation: .up, options: [:])
       try handler.perform([textRequest, barcodeRequest])
 
       var lines: [[String: Any]] = []
@@ -64,18 +72,19 @@ public class LabelReaderModule: Module {
     }
   }
 
-  // Photos from the camera are stored sideways with a note saying which way is up.
-  private static func orientation(of image: UIImage) -> CGImagePropertyOrientation {
-    switch image.imageOrientation {
-    case .up: return .up
-    case .down: return .down
-    case .left: return .left
-    case .right: return .right
-    case .upMirrored: return .upMirrored
-    case .downMirrored: return .downMirrored
-    case .leftMirrored: return .leftMirrored
-    case .rightMirrored: return .rightMirrored
-    @unknown default: return .up
+  // The photo drawn the right way up, and no bigger than maxSide pixels on its longest side (when maxSide > 0).
+  private static func upright(_ image: UIImage, maxSide: CGFloat) -> UIImage {
+    let size = image.size
+    let longest = max(size.width, size.height)
+    let factor = (maxSide > 0 && longest > maxSide) ? maxSide / longest : 1
+    if factor == 1 && image.imageOrientation == .up {
+      return image
+    }
+    let newSize = CGSize(width: floor(size.width * factor), height: floor(size.height * factor))
+    let format = UIGraphicsImageRendererFormat()
+    format.scale = 1
+    return UIGraphicsImageRenderer(size: newSize, format: format).image { _ in
+      image.draw(in: CGRect(origin: .zero, size: newSize))
     }
   }
 }
