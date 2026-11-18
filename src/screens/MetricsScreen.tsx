@@ -442,7 +442,7 @@ function GraphView({ metric, color, today }: { metric: Metric; color: string; to
   const d = useData();
   const [range, setRange] = useState<Range>('1M');
   const [exId, setExId] = useState<string | null>(null);
-  const [measure, setMeasure] = useState<'weight' | 'strength'>('weight');
+  const [pickedMeasure, setMeasure] = useState<'weight' | 'strength' | 'dist'>('weight');
   const [picking, setPicking] = useState(false);
 
   // Every exercise that has been logged (current name if it still exists, else the name it was logged under).
@@ -463,19 +463,23 @@ function GraphView({ metric, color, today }: { metric: Metric; color: string; to
   }, [d.workouts, d.sessions]);
   const ex = exercises.find((e) => e.id === exId) ?? exercises[0];
   const cardio = ex?.kind === 'cardio'; // minutes and (say) watts instead of kg and reps
+  const withDist = cardio && ex?.unit !== 'km'; // cardio with its own distance number
+  const measure = pickedMeasure === 'dist' && !withDist ? 'weight' : pickedMeasure;
 
   // The best set of that exercise on each day it was done.
   const tops = useMemo(() => {
     if (!ex) return [];
-    const out: { date: DateKey; weight: number; reps: number }[] = [];
+    const out: { date: DateKey; weight: number; reps: number; dist?: number }[] = [];
     const days = [...d.workoutsByDay.keys()].sort();
     for (const date of days) {
       const sets = (d.workoutsByDay.get(date) ?? []).flatMap((w) => w.sets).filter((s) => s.exerciseId === ex.id);
       const best =
         measure === 'weight'
           ? topSet(sets)
-          : sets.slice().sort((a, b) => (cardio ? b.reps - a.reps : e1rm(b) - e1rm(a)))[0];
-      if (best) out.push({ date, weight: best.weight, reps: best.reps });
+          : measure === 'dist'
+            ? sets.filter((s) => (s.dist ?? 0) > 0).sort((a, b) => (b.dist ?? 0) - (a.dist ?? 0))[0]
+            : sets.slice().sort((a, b) => (cardio ? b.reps - a.reps : e1rm(b) - e1rm(a)))[0];
+      if (best) out.push({ date, weight: best.weight, reps: best.reps, dist: best.dist });
     }
     return out;
   }, [ex, cardio, d.workoutsByDay, measure]);
@@ -491,7 +495,7 @@ function GraphView({ metric, color, today }: { metric: Metric; color: string; to
   if (metric === 'overload') {
     points = tops.map((t) => ({
       date: t.date,
-      value: measure === 'weight' ? t.weight : cardio ? t.reps : Math.round(e1rm(t) * 10) / 10,
+      value: measure === 'weight' ? t.weight : measure === 'dist' ? (t.dist ?? 0) : cardio ? t.reps : Math.round(e1rm(t) * 10) / 10,
     }));
     line = points;
     dots = points;
@@ -566,6 +570,7 @@ function GraphView({ metric, color, today }: { metric: Metric; color: string; to
                 options={[
                   { key: 'weight', label: cardio ? 'Time' : 'Top weight' },
                   { key: 'strength', label: cardio ? (CARDIO_METRICS.find((m) => m.key === ex?.unit)?.label ?? 'Watts') : 'Strength' },
+                  ...(withDist ? [{ key: 'dist' as const, label: 'Distance' }] : []),
                 ]}
                 value={measure}
                 onChange={setMeasure}
@@ -584,7 +589,9 @@ function GraphView({ metric, color, today }: { metric: Metric; color: string; to
       <Text style={[T.small, { marginTop: 6, lineHeight: 18 }]}>
         {metric === 'overload'
           ? cardio
-            ? measure === 'weight'
+            ? measure === 'dist'
+              ? 'The furthest distance of this cardio each time you did it, in km.'
+              : measure === 'weight'
               ? 'The longest round of this cardio each time you did it, in minutes.'
               : 'The highest number (watts, distance, calories or level) of this cardio each time you did it.'
             : measure === 'weight'

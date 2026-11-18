@@ -256,7 +256,7 @@ export const useTraining = create<State>()(
           const si = w.sets.findIndex((s) => s.exerciseId === oid && s.setIndex === index);
           if (si >= 0) {
             // Changing a set already logged today: what it's compared with stays the last time's numbers.
-            w.sets[si] = { ...w.sets[si], exerciseName: ex.name, weight: val.weight, reps: val.reps, ...kindOf(ex) };
+            w.sets[si] = { ...w.sets[si], exerciseName: ex.name, weight: val.weight, reps: val.reps, dist: val.dist, ...kindOf(ex) };
           } else {
             w.sets.push({
               exerciseId: oid,
@@ -264,6 +264,7 @@ export const useTraining = create<State>()(
               setIndex: index,
               weight: val.weight,
               reps: val.reps,
+              ...(val.dist ? { dist: val.dist } : {}),
               prev: isBlank(before) ? null : { ...before },
               ...kindOf(ex),
             });

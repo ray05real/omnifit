@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { addDays, agoLabel, daysBetween, formatDay, fromKey, monthGrid, relativeDay, toKey } from './dates.ts';
-import { compareSet, dayChange, describeChange, formatMinutes, formatWeight, setLabel, splitWeight, topSet, type LoggedSet } from './overload.ts';
+import { compareSet, dayChange, describeChange, formatMinutes, formatWeight, isBlank, setLabel, splitWeight, topSet, type LoggedSet } from './overload.ts';
 import { amountLabel, dayStatus, dishPart, dishTotals, macroKcal, parseNum, proteinHit, scale, sum, thousands } from './nutrition.ts';
 import { formatDuration, hours1, sleepStatus, toPoints, trend } from './body.ts';
 
@@ -87,6 +87,17 @@ test('overload: cardio is minutes and watts', () => {
   assert.equal(setLabel({ weight: 50, reps: 10 }), '50kg – 10');
   assert.equal(describeChange({ weight: 25, reps: 160 }, prev, 'cardio', 'W'), '+5 min · +10 W');
   assert.equal(describeChange({ weight: 19.5, reps: 150 }, prev, 'cardio', 'W'), '−0:30 min');
+  // A third number: the distance (km).
+  const ride = { weight: 60, reps: 150, dist: 25 };
+  assert.equal(setLabel(ride, 'cardio', 'W'), '60min – 150W – 25km');
+  assert.equal(setLabel({ ...ride, dist: 25.5 }, 'cardio', 'W'), '60min – 150W – 25.5km');
+  assert.equal(setLabel({ weight: 60, reps: 25 }, 'cardio', 'km'), '60min – 25km'); // the km is already the second number
+  assert.equal(compareSet({ weight: 60, reps: 150, dist: 27 }, ride, 'cardio'), 'up'); // further in the same time
+  assert.equal(compareSet({ weight: 60, reps: 150, dist: 23 }, ride, 'cardio'), 'down');
+  assert.equal(compareSet({ weight: 60, reps: 150, dist: 25 }, ride, 'cardio'), 'same');
+  assert.equal(compareSet({ weight: 60, reps: 150, dist: 27 }, { weight: 60, reps: 150 }, 'cardio'), 'same'); // no distance last time
+  assert.equal(describeChange({ weight: 60, reps: 160, dist: 27.5 }, ride, 'cardio', 'W'), '+10 W · +2.5 km');
+  assert.equal(isBlank({ weight: 0, reps: 0, dist: 5 }), false);
 });
 
 test('nutrition: amounts, totals and the day', () => {

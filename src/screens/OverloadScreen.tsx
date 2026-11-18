@@ -32,6 +32,7 @@ import {
   describeChange,
   formatMinutes,
   formatWeight,
+  hasDistance,
   isBlank,
   setLabel,
   splitWeight,
@@ -173,7 +174,8 @@ function SplitList({ onOpen }: { onOpen: (id: string, edit: boolean) => void }) 
 
 // ───────────────────────── One session: each exercise a paragraph ─────────────────────────
 
-type WheelTarget = { exId: string; index: number; part: 'weight' | 'reps' };
+type WheelPart = 'weight' | 'reps' | 'dist';
+type WheelTarget = { exId: string; index: number; part: WheelPart };
 
 function SessionView({ session, startInEdit, onBack }: { session: Session; startInEdit: boolean; onBack: () => void }) {
   const today = useToday();
@@ -350,6 +352,7 @@ function SessionView({ session, startInEdit, onBack }: { session: Session; start
             edit={edit}
             onWeight={() => setWheel({ exId: ex.id, index: i, part: 'weight' })}
             onReps={() => setWheel({ exId: ex.id, index: i, part: 'reps' })}
+            onDist={() => setWheel({ exId: ex.id, index: i, part: 'dist' })}
             onTick={() => {
               const lg = loggedSet(optionId(ex), i);
               if (lg) {
@@ -383,7 +386,15 @@ function SessionView({ session, startInEdit, onBack }: { session: Session; start
   const wheelKind: ExerciseKind = wheelEx?.kind ?? 'strength';
   const wheelMetric: CardioMetric = wheelEx?.metric ?? 'W';
   const partWord =
-    wheel?.part === 'weight' ? (wheelKind === 'cardio' ? 'time' : 'weight') : wheelKind === 'cardio' ? METRIC_WORD[wheelMetric] : 'reps';
+    wheel?.part === 'dist'
+      ? 'distance'
+      : wheel?.part === 'weight'
+        ? wheelKind === 'cardio'
+          ? 'time'
+          : 'weight'
+        : wheelKind === 'cardio'
+          ? METRIC_WORD[wheelMetric]
+          : 'reps';
 
   return (
     <Screen
@@ -534,6 +545,7 @@ function SetRow({
   edit,
   onWeight,
   onReps,
+  onDist,
   onTick,
   onRemove,
 }: {
@@ -545,6 +557,7 @@ function SetRow({
   edit: boolean;
   onWeight: () => void;
   onReps: () => void;
+  onDist: () => void;
   onTick: () => void;
   onRemove: () => void;
 }) {
@@ -593,6 +606,23 @@ function SetRow({
             {cardio && metric !== 'level' ? <Text style={styles.unit}>{metric}</Text> : null}
           </Text>
         </Pressable>
+        {hasDistance(kind, metric) ? (
+          <>
+            <Text style={[styles.setText, styles.dash]}>–</Text>
+            <Pressable
+              onPress={onDist}
+              hitSlop={{ top: 6, bottom: 6, right: 8 }}
+              accessibilityRole="button"
+              accessibilityLabel={`Set ${index + 1} distance: ${formatWeight(set.dist ?? 0)} kilometres. Tap to change.`}
+              style={({ pressed }) => [styles.part, pressed && styles.partPressed]}
+            >
+              <Text style={[styles.setText, !(set.dist ?? 0) && { color: C.faint }]}>
+                {formatWeight(set.dist ?? 0)}
+                <Text style={styles.unit}>km</Text>
+              </Text>
+            </Pressable>
+          </>
+        ) : null}
         {!edit && tag ? (
           <View style={[styles.tag, { backgroundColor: alpha(color, 0.18) }]}>
             <Text style={[styles.tagText, { color }]} numberOfLines={1}>
@@ -680,6 +710,7 @@ const MINUTES = range(0, 300);
 const WATTS = range(0, 1000, 5);
 const KM = range(0, 200);
 const TENTHS = range(0, 9);
+const KM_LONG = range(0, 300);
 const KCAL = range(0, 3000, 10);
 const LEVELS = range(0, 30);
 
@@ -703,7 +734,7 @@ function SetWheelSheet({
 }: {
   title: string;
   subtitle: string;
-  part: 'weight' | 'reps'; // which of the two was tapped: only that one's wheel shows
+  part: WheelPart; // which number was tapped: only its wheel shows
   kind: ExerciseKind;
   metric: CardioMetric;
   initial: SetVal;
@@ -720,10 +751,15 @@ function SetWheelSheet({
   const secondValues = !cardio ? REPS : metric === 'W' ? WATTS : metric === 'kcal' ? KCAL : metric === 'level' ? LEVELS : KM;
   const [second, setSecond] = useState(snap(metric === 'km' && cardio ? Math.floor(initial.reps) : initial.reps, secondValues));
   const [tenth, setTenth] = useState(cardio && metric === 'km' ? Math.round((initial.reps % 1) * 10) % 10 : 0);
+  // The cardio distance (km and tenths).
+  const distTenths = Math.round((initial.dist ?? 0) * 10);
+  const [distKm, setDistKm] = useState(Math.min(Math.floor(distTenths / 10), 300));
+  const [distTenth, setDistTenth] = useState(distTenths % 10);
 
   const value = (): SetVal => ({
     weight: whole + quarter,
     reps: cardio && metric === 'km' ? Math.round((second + tenth / 10) * 10) / 10 : second,
+    ...(hasDistance(kind, metric) && distKm + distTenth > 0 ? { dist: Math.round((distKm + distTenth / 10) * 10) / 10 } : {}),
   });
 
   return (
@@ -738,6 +774,11 @@ function SetWheelSheet({
             onChange={setQuarter}
             format={(v) => (cardio ? ':' + (v === 0 ? '00' : String(v * 60)) : v === 0 ? '.0' : '.' + String(v).slice(2))}
           />
+        </WheelRow>
+      ) : part === 'dist' ? (
+        <WheelRow>
+          <WheelColumn label="km" values={KM_LONG} value={distKm} onChange={setDistKm} flex={1.4} />
+          <WheelColumn label="+" values={TENTHS} value={distTenth} onChange={setDistTenth} format={(v) => '.' + v} />
         </WheelRow>
       ) : (
         <WheelRow>

@@ -113,6 +113,9 @@ Overload · Nutrition · Weight · Sleep · Metrics.
   exercises (Edit → "+ Cardio"): a name (Bike, Rower…) and lines of **time – watts** ("20min – 150W"); the
   second number can be switched in Edit to km, kcal or level. Same wheels, ticks and up / same / down
   (more time or more watts = up; if they go opposite ways, minutes × watts decides).
+  **Distance (the owner, 18 Nov 2026):** a cardio line has a third number, the km ("60min – 150W – 25km"), with
+  its own wheel (km and tenths); hidden when the second number is already km. It counts in up / same / down only
+  when both times have a distance. Metrics has a "Distance" graph for it. Stored as `SetVal.dist`.
 - **Exercise options (the owner, 16 Nov 2026):** an exercise can have other versions of itself (e.g. "Preacher
   curl" / "Single-arm preacher curl"), **each with its own weights and reps**. **No presets or catalogue: the owner
   types each option's name, and a new option starts with empty numbers.** In Edit, chips under the exercise's
