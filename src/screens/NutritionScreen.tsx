@@ -117,7 +117,7 @@ export const NutritionScreen = React.memo(function NutritionScreen() {
                   {e.name}
                 </Text>
                 <Text style={[T.small, { marginTop: 2 }]} numberOfLines={1}>
-                  {e.amount && e.unit ? amountLabel(e.amount, e.unit) + ' · ' : ''}P {round1(e.protein)} · C{' '}
+                  {e.amount && e.unit ? amountLabel(e.amount, e.unit, e.dish) + ' · ' : ''}P {round1(e.protein)} · C{' '}
                   {round1(e.carbs)} · F {round1(e.fat)}
                 </Text>
               </View>
@@ -349,7 +349,7 @@ function EntryEditor({ entry, onClose }: { entry: FoodEntry; onClose: () => void
                 value={amount}
                 onChangeText={changeAmount}
                 keyboardType="decimal-pad"
-                suffix={entry.unit === 'serving' ? 'servings' : entry.unit}
+                suffix={entry.dish ? 'dish' : entry.unit === 'serving' ? 'servings' : entry.unit}
                 selectTextOnFocus
               />
             ) : null}

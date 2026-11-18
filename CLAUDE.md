@@ -151,6 +151,16 @@ Overload · Nutrition · Weight · Sleep · Metrics.
     ¼ pack / ½ pack / Whole pack next to typing the grams.
   - The first version (one button, a single photo) "only picked up some numbers" on the owner's phone (16 Nov);
     this live version is not yet confirmed there.
+- **Dishes (the owner, 18 Nov 2026: "scanning each ingredient clogs up my food log"; keep it simple).** In Log
+  food, next to "New food", a **"New dish"** button (`src/screens/DishForm.tsx`): one page with the dish's name,
+  "What went into it" (each ingredient with how much went in and its kcal; tap one to change or remove it),
+  "+ Add ingredient" and the whole dish's totals. **"+ Add ingredient" offers the usual ways:** scan its barcode
+  (the owner's version only), scan its nutrition table, pick it from My foods, or type the numbers; all end in the
+  same small form (check the numbers, "How much went in", with ¼ / ½ / whole pack when the pack size is known).
+  **The ingredients live inside the dish, not in My foods.** The dish is saved in My foods as one food (unit
+  'serving', 1 = the whole dish; "Dish · 3 ingredients" under its name; the edit button reopens the dish). Logging
+  it offers **Whole / ½ / ⅓ / ¼** (or a typed part) and the day's log gets **one line**, e.g. "½ dish".
+  Model: `Food.ingredients`, `Ingredient`, `dishTotals`, `dishPart`, `FoodEntry.dish` in `src/lib/nutrition.ts`.
 - **Testing is by sideloaded .ipa now** (the owner, 14 Nov 2026), same as the To Do app: every push to GitHub
   builds unsigned .ipa files on GitHub's Macs (`.github/workflows/build.yml`) and publishes them as a Release;
   the owner signs them in Kravasigner. The repository is public for that (free Mac builds, direct links).

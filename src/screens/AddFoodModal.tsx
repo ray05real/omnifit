@@ -1,4 +1,5 @@
-// "Log food": pick from My foods (the owner's own catalogue), make a new food, or quick-add calories and macros.
+// "Log food": pick from My foods (the owner's own catalogue), make a new food or a dish (several ingredients
+// saved as one food), or quick-add calories and macros.
 
 import React, { useMemo, useState } from 'react';
 import {
@@ -44,10 +45,17 @@ import {
 import { ScanCamera, type ScanMode } from '../scan/ScanCamera';
 import { barcodeLookup, scanAvailable, type PackValues } from '../scan/scan';
 import { useToday } from '../store/hooks';
+import { DishForm } from './DishForm';
 import { useNutrition } from '../store/nutrition';
 import { C, PAD, T } from '../theme';
 
-type View_ = { kind: 'home' } | { kind: 'amount'; food: Food } | { kind: 'form'; food: Food | null };
+type View_ =
+  | { kind: 'home' }
+  | { kind: 'amount'; food: Food }
+  | { kind: 'form'; food: Food | null }
+  | { kind: 'dish'; food: Food | null };
+
+type LogFrom = { foodId: string; amount: number; unit: FoodUnit; dish?: boolean };
 
 export function AddFoodModal({ visible, date, onClose }: { visible: boolean; date: DateKey; onClose: () => void }) {
   const insets = useSafeAreaInsets();
@@ -68,14 +76,24 @@ export function AddFoodModal({ visible, date, onClose }: { visible: boolean; dat
       .sort((a, b) => b.lastUsed - a.lastUsed);
   }, [foods, query]);
 
-  const log = (name: string, m: Macros, from?: { foodId: string; amount: number; unit: FoodUnit }) => {
+  const log = (name: string, m: Macros, from?: LogFrom) => {
     buzz('done');
     addEntry({ date, time, name, ...m, ...(from ?? {}) });
     onClose();
   };
 
   const title =
-    view.kind === 'amount' ? view.food.name : view.kind === 'form' ? (view.food ? 'Edit food' : 'New food') : 'Log food';
+    view.kind === 'amount'
+      ? view.food.name
+      : view.kind === 'form'
+        ? view.food
+          ? 'Edit food'
+          : 'New food'
+        : view.kind === 'dish'
+          ? view.food
+            ? 'Edit dish'
+            : 'New dish'
+          : 'Log food';
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
@@ -151,8 +169,10 @@ export function AddFoodModal({ visible, date, onClose }: { visible: boolean; dat
                               {f.name}
                             </Text>
                             <Text style={[T.small, { marginTop: 2 }]} numberOfLines={1}>
-                              {basisLabel(f.unit)} · {thousands(f.kcal)} kcal · P {round1(f.protein)} · C{' '}
-                              {round1(f.carbs)} · F {round1(f.fat)}
+                              {f.ingredients?.length
+                                ? `Dish · ${f.ingredients.length} ${f.ingredients.length === 1 ? 'ingredient' : 'ingredients'} · `
+                                : basisLabel(f.unit) + ' · '}
+                              {thousands(f.kcal)} kcal · P {round1(f.protein)} · C {round1(f.carbs)} · F {round1(f.fat)}
                             </Text>
                           </Pressable>
                           <IconButton
@@ -160,19 +180,17 @@ export function AddFoodModal({ visible, date, onClose }: { visible: boolean; dat
                             size={20}
                             color={C.muted}
                             label={`Edit ${f.name}`}
-                            onPress={() => setView({ kind: 'form', food: f })}
+                            onPress={() => setView({ kind: f.ingredients?.length ? 'dish' : 'form', food: f })}
                           />
                         </View>
                       ))
                     )}
                   </ScrollView>
-                  <GhostButton
-                    label="New food"
-                    icon="add"
-                    color={C.nutrition}
-                    onPress={() => setView({ kind: 'form', food: null })}
-                    style={{ marginTop: 8 }}
-                  />
+                  {/* A single food, or a dish made of several (saved as one, so the log gets one line). */}
+                  <View style={styles.newRow}>
+                    <GhostButton label="New food" icon="add" color={C.text} onPress={() => setView({ kind: 'form', food: null })} style={{ flex: 1 }} />
+                    <GhostButton label="New dish" icon="restaurant-outline" color={C.text} onPress={() => setView({ kind: 'dish', food: null })} style={{ flex: 1 }} />
+                  </View>
                 </>
               ) : (
                 <QuickAdd onLog={log} />
@@ -180,6 +198,12 @@ export function AddFoodModal({ visible, date, onClose }: { visible: boolean; dat
             </>
           ) : view.kind === 'amount' ? (
             <AmountView food={view.food} onLog={log} />
+          ) : view.kind === 'dish' ? (
+            <DishForm
+              dish={view.food}
+              onSaved={(food, isNew) => setView(isNew ? { kind: 'amount', food } : { kind: 'home' })}
+              onDeleted={() => setView({ kind: 'home' })}
+            />
           ) : (
             <FoodForm
               food={view.food}
@@ -211,9 +235,10 @@ function AmountView({
   onLog,
 }: {
   food: Food;
-  onLog: (name: string, m: Macros, from: { foodId: string; amount: number; unit: FoodUnit }) => void;
+  onLog: (name: string, m: Macros, from: LogFrom) => void;
 }) {
   const entries = useNutrition((s) => s.entries);
+  const isDish = !!food.ingredients?.length;
   // Start from the amount used last time.
   const lastAmount = useMemo(() => {
     for (let i = entries.length - 1; i >= 0; i--) {
@@ -229,20 +254,61 @@ function AmountView({
     <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
       <Card style={{ marginTop: 14, backgroundColor: C.card2 }}>
         <Text style={T.small}>
-          {basisLabel(food.unit)}: {thousands(food.kcal)} kcal · P {round1(food.protein)} · C {round1(food.carbs)} · F{' '}
-          {round1(food.fat)}
+          {isDish ? 'Whole dish' : basisLabel(food.unit)}: {thousands(food.kcal)} kcal · P {round1(food.protein)} · C{' '}
+          {round1(food.carbs)} · F {round1(food.fat)}
         </Text>
         <MacroLine m={m} />
       </Card>
-      <Field
-        label="How much"
-        value={amount}
-        onChangeText={setAmount}
-        keyboardType="decimal-pad"
-        suffix={food.unit === 'serving' ? 'servings' : food.unit}
-        autoFocus
-        selectTextOnFocus
-      />
+      {isDish ? (
+        // How much of the dish: tap a part, or type one (1 = the whole dish).
+        <>
+          <View style={styles.packRow}>
+            {(
+              [
+                ['Whole', 1],
+                ['½', 0.5],
+                ['⅓', 1 / 3],
+                ['¼', 0.25],
+              ] as const
+            ).map(([label, part]) => {
+              const on = Math.abs(n - part) < 0.01;
+              return (
+                <Pressable
+                  key={label}
+                  onPress={() => {
+                    buzz();
+                    setAmount(String(Math.round(part * 1000) / 1000));
+                  }}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: on }}
+                  style={[styles.packChip, on && { backgroundColor: C.text }]}
+                >
+                  <Text style={[styles.packChipText, on && { color: C.ink }]}>{label}</Text>
+                  <Text style={[T.small, on && { color: C.ink }]}>{thousands(scale(food, part).kcal)} kcal</Text>
+                </Pressable>
+              );
+            })}
+          </View>
+          <Field
+            label="Or type how much (1 = the whole dish)"
+            value={amount}
+            onChangeText={setAmount}
+            keyboardType="decimal-pad"
+            suffix="dish"
+            selectTextOnFocus
+          />
+        </>
+      ) : (
+        <Field
+          label="How much"
+          value={amount}
+          onChangeText={setAmount}
+          keyboardType="decimal-pad"
+          suffix={food.unit === 'serving' ? 'servings' : food.unit}
+          autoFocus
+          selectTextOnFocus
+        />
+      )}
       {food.pack && food.unit !== 'serving' ? (
         <View style={styles.packRow}>
           {(
@@ -273,7 +339,7 @@ function AmountView({
         label="Log it"
         color={C.nutrition}
         disabled={n <= 0}
-        onPress={() => onLog(food.name, m, { foodId: food.id, amount: n, unit: food.unit })}
+        onPress={() => onLog(food.name, m, { foodId: food.id, amount: n, unit: food.unit, ...(isDish ? { dish: true } : {}) })}
         style={{ marginTop: 18 }}
       />
     </ScrollView>
@@ -437,7 +503,7 @@ function FoodForm({
 function QuickAdd({
   onLog,
 }: {
-  onLog: (name: string, m: Macros, from?: { foodId: string; amount: number; unit: FoodUnit }) => void;
+  onLog: (name: string, m: Macros, from?: LogFrom) => void;
 }) {
   const addFood = useNutrition((s) => s.addFood);
   const [name, setName] = useState('');
@@ -532,6 +598,7 @@ const styles = StyleSheet.create({
   kcal: { color: C.text, fontSize: 34, fontWeight: '800', letterSpacing: -0.6, fontVariant: ['tabular-nums'] },
   macro: { fontSize: 15, fontWeight: '700', marginLeft: 8, fontVariant: ['tabular-nums'] },
   scanRow: { flexDirection: 'row', gap: 10, marginTop: 6 },
+  newRow: { flexDirection: 'row', gap: 10, marginTop: 8 },
   packRow: { flexDirection: 'row', gap: 8, marginTop: 12 },
   packChip: { flex: 1, alignItems: 'center', backgroundColor: C.card2, borderRadius: 14, paddingVertical: 9 },
   packChipText: { color: C.text, fontSize: 15, fontWeight: '600' },

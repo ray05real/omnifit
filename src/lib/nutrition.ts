@@ -13,6 +13,18 @@ export type Food = Macros & {
   unit: FoodUnit;
   lastUsed: number;
   pack?: number; // grams or ml in a whole pack, when known: for "half a pack"
+  // A dish (the owner, 18 Nov 2026): a food made of ingredients. Its own numbers are the whole dish's
+  // (unit 'serving', 1 = the whole dish), worked out from the ingredients.
+  ingredients?: Ingredient[];
+};
+
+// An ingredient of a dish: a food's numbers (per 100 g, 100 ml or serving) and how much of it went in.
+export type Ingredient = Macros & {
+  id: string;
+  name: string;
+  unit: FoodUnit;
+  amount: number;
+  pack?: number;
 };
 
 export type FoodEntry = Macros & {
@@ -23,6 +35,7 @@ export type FoodEntry = Macros & {
   foodId?: string;
   amount?: number; // grams, ml or servings
   unit?: FoodUnit;
+  dish?: boolean; // logged from a dish: the amount is a part of the whole dish
 };
 
 export const ZERO: Macros = { kcal: 0, protein: 0, carbs: 0, fat: 0 };
@@ -35,10 +48,29 @@ export function basisLabel(unit: FoodUnit): string {
   return unit === 'serving' ? 'per serving' : unit === 'ml' ? 'per 100 ml' : 'per 100 g';
 }
 
-export function amountLabel(amount: number, unit: FoodUnit): string {
+export function amountLabel(amount: number, unit: FoodUnit, dish?: boolean): string {
+  if (dish) return dishPart(amount);
   const n = round1(amount);
   if (unit === 'serving') return n + (n === 1 ? ' serving' : ' servings');
   return n + ' ' + unit;
+}
+
+// What a whole dish comes to: every ingredient, by how much of it went in.
+export function dishTotals(ingredients: Ingredient[]): Macros {
+  return sum(ingredients.map((i) => scale(i, i.amount)));
+}
+
+// How much of a dish was eaten, in words: 'Whole dish', '½ dish', '⅓ dish', '2 dishes', '0.8 of the dish'.
+export function dishPart(amount: number): string {
+  const near = (v: number) => Math.abs(amount - v) < 0.01;
+  if (near(1)) return 'Whole dish';
+  if (near(0.5)) return '½ dish';
+  if (near(1 / 3)) return '⅓ dish';
+  if (near(0.25)) return '¼ dish';
+  if (near(2 / 3)) return '⅔ dish';
+  if (near(0.75)) return '¾ dish';
+  if (amount > 1 && Math.abs(amount - Math.round(amount)) < 0.01) return Math.round(amount) + ' dishes';
+  return Math.round(amount * 100) / 100 + ' of the dish';
 }
 
 export function round1(n: number): number {

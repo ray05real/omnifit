@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 
 import { addDays, agoLabel, daysBetween, formatDay, fromKey, monthGrid, relativeDay, toKey } from './dates.ts';
 import { compareSet, dayChange, describeChange, formatMinutes, formatWeight, setLabel, splitWeight, topSet, type LoggedSet } from './overload.ts';
-import { dayStatus, macroKcal, parseNum, proteinHit, scale, sum, thousands } from './nutrition.ts';
+import { amountLabel, dayStatus, dishPart, dishTotals, macroKcal, parseNum, proteinHit, scale, sum, thousands } from './nutrition.ts';
 import { formatDuration, hours1, sleepStatus, toPoints, trend } from './body.ts';
 
 test('dates: keys are local days and survive month ends and clock changes', () => {
@@ -107,6 +107,30 @@ test('nutrition: amounts, totals and the day', () => {
   assert.equal(parseNum('12,5'), 12.5);
   assert.equal(parseNum(''), 0);
   assert.equal(parseNum('-4'), 0);
+});
+
+test('nutrition: a dish is the sum of what went into it', () => {
+  const ing = (name: string, unit: 'g' | 'ml' | 'serving', amount: number, kcal: number, protein: number, carbs: number, fat: number) => ({
+    id: name, name, unit, amount, kcal, protein, carbs, fat,
+  });
+  const dish = dishTotals([
+    ing('Chicken breast', 'g', 250, 165, 31, 0, 3.6), // 413 kcal, 77.5 P, 0 C, 9 F
+    ing('Basmati rice', 'g', 200, 130, 2.7, 28, 0.3), // 260 kcal, 5.4 P, 56 C, 0.6 F
+    ing('Carrots', 'g', 120, 41, 0.9, 10, 0.2), // 49 kcal, 1.1 P, 12 C, 0.2 F
+    ing('Philadelphia', 'g', 90, 250, 5.4, 4.3, 21), // half a 180 g tub: 225 kcal, 4.9 P, 3.9 C, 18.9 F
+  ]);
+  assert.deepEqual(dish, { kcal: 947, protein: 88.9, carbs: 71.9, fat: 28.7 });
+  assert.deepEqual(dishTotals([]), { kcal: 0, protein: 0, carbs: 0, fat: 0 });
+  // Logging part of it uses the same scaling as any food "per serving" (1 = the whole dish).
+  assert.deepEqual(scale({ ...dish, unit: 'serving' }, 0.5), { kcal: 474, protein: 44.5, carbs: 36, fat: 14.4 });
+  assert.equal(dishPart(1), 'Whole dish');
+  assert.equal(dishPart(0.5), '½ dish');
+  assert.equal(dishPart(0.333), '⅓ dish');
+  assert.equal(dishPart(0.25), '¼ dish');
+  assert.equal(dishPart(2), '2 dishes');
+  assert.equal(dishPart(0.8), '0.8 of the dish');
+  assert.equal(amountLabel(0.5, 'serving', true), '½ dish');
+  assert.equal(amountLabel(2, 'serving'), '2 servings');
 });
 
 test('body: sleep and the weight trend', () => {
